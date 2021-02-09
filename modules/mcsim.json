@@ -1,0 +1,284 @@
+{
+    "moduleid" : "mcsim"
+    ,"label"    : "McSim"
+    ,"executable"   : "mcsim.py"
+    ,"submitpolicy" : "all"
+#    ,"uniquedir" : "true"
+#    ,"center" : "true"
+    ,"centeroutput" : "true"
+# dependencies:
+# apt-get install libgfortran3 libpng-dev libreadline-dev
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "label_0"
+            ,"type"      : "label"
+            ,"colspan"   : 3
+            ,"default"   : "header3"
+            ,"label"     : "McSim [<a target=_blank href=https://doi.org/10.1107/S1600576714013156>1,</a><a target=_blank href=https://github.com/andreashlarsen/McSim/blob/main/README.md>Source code</a>]"	   
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "qmin"
+            ,"label"      : "q min"
+            ,"type"       : "float"
+            ,"step"       : 0.001
+	    ,"default"    : 0.01
+            ,"help"       : "q min in inverse Angstroms."
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "qmax"
+            ,"label"      : "q max "
+            ,"type"       : "float"
+            ,"step"       : 0.001
+	    ,"default"    : 1.0
+            ,"help"       : "q max in inverse Angstroms."
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "polydispersity"
+            ,"label"      : "Relative polydispersity"
+            ,"type"       : "float"
+            ,"step"       : 0.01
+            ,"default"    : 0.0
+	    ,"min"        : 0.0
+	    ,"max"        : 0.2
+            ,"help"       : "Relative polydispersity. Min: 0.0 (monodisperse), max: 0.2."
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "eta"
+            ,"label"      : "Volume fraction"
+            ,"type"       : "float"
+            ,"step"       : 0.01
+            ,"default"    : 0.0
+            ,"min"        : 0.0
+            ,"max"        : 0.9
+            ,"help"       : "<p>Volume fraction - for high concentration samples.</p><p> Giving rise to a hard sphere structure factor, S(q)</p><p>Min: 0.0 (no structure factor), max: 0.9.</p>"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "prpoints"
+            ,"label"      : "Number of points in p(r)"
+            ,"type"       : "integer"
+            ,"min"        : 10
+            ,"default"    : 100
+            ,"max"        : 200
+            ,"help"       : "<p>Optionally enter the number of points in the estimated function p(r).</p><p>Default: 100, Minimum 10, Maximum 200</p>"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "label_model"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "Model"
+            ,"norow"      : "true"
+	    ,"readonly"   : "true"
+	    ,"size"       : 17
+            ,"help"       : "<p>Models and parameters:</p><p>Sphere; a: Radius, b,c: no effect</p><p> Ellipsoid; a, b, c: semiaxes</p><p> Cylinder/Disc; a, b: semiaxes, c: length</p><p>Cube; a: side length, b,c: no effect</p><p>Cuboid; a: width, b: depth, c: height</p><p>Hollow sphere; a: outer radius, b: inner radius, c: no effect</p><p>Hollow square; a: outer side length, b: inner side length, c: no effect </p><p>Cylindrical/discoidal ring; a: outer radius, b: inner radius, c: length </p>"
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_a"
+            ,"label"      : " "
+            ,"type"       : "text"
+	    ,"default"    : "a"
+	    ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "<p>Sphere: radius</p><p> Ellipsoid: semiaxis </p><p> Cylinder/Disc: semiaxis</p><p>Cube: side length</p><p>Cuboid: width</p><p>Hollow sphere: outer radius</p><p>Hollow square: outer side length</p><p>Cylindrical/discoidal ring: outer radius </p>"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "label_b"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "b"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "<p>Sphere: no effect</p><p> Ellipsoid: semiaxis </p><p> Cylinder/Disc: semiaxis</p><p>Cube: no effect</p><p>Cuboid: depth</p><p>Hollow sphere: inner radius</p><p>Hollow square: inner side length</p><p>Cylindrical/discoidal ring: inner radius </p>"
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_c"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "c"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "<p>Sphere: no effect</p><p> Ellipsoid: semiaxis </p><p> Cylinder/Disc*: length</p><p>Cube: no effect</p><p>Cuboid: height</p><p>Hollow sphere: no effect </p><p>Hollow square: no effect</p><p>Cylindrical/discoidal ring*: length </p><p>*Cylinder and disc is the same model. They just differe in default paramters. Same is true for discoidal and cylindrical ring.</p>"
+	}
+        ,{
+            "role"       : "input"
+            ,"id"         : "label_p"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "Delta SL"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "Excess scattering length per point in object"
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_x"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "x_com"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "center of mass x position of object" 
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_y"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "y_com"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "center of mass y position of object"
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_z"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "z_com"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "center of mass z position of object"
+        }
+#################################################################################################################       
+        ,{"role": "input","id": "model1","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring","norow": "true","size": 30,"default": "sphere"}
+        ,{"role": "input","id": "a1","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "b1","label": " ","type": "float","min": "0","norow": "true"}
+        ,{"role": "input","id": "c1","label": " ","type": "float","min": "0","norow": "true"}
+	,{"role": "input","id": "p1","label": " ","type": "float","default": 1,"norow": "true"}
+	,{"role": "input","id": "x1","label": " ","type": "float","default": 0.0,"norow": "true"}
+	,{"role": "input","id": "y1","label": " ","type": "float","default": 0.0,"norow": "true"}
+	,{"role": "input","id": "z1","label": " ","type": "float","default": 0.0,"norow": "true"}
+#################################################################################################################       
+        ,{"role": "input","id": "model2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a2","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "b2","label": " ","type": "float","min": "0","norow": "true"}
+        ,{"role": "input","id": "c2","label": " ","type": "float","min": "0","norow": "true"}
+        ,{"role": "input","id": "p2","label": " ","type": "float","default": 1,"norow": "true"}
+        ,{"role": "input","id": "x2","label": " ","type": "float","default": 0.0,"norow": "true"}
+        ,{"role": "input","id": "y2","label": " ","type": "float","default": 0.0,"norow": "true"}
+        ,{"role": "input","id": "z2","label": " ","type": "float","default": 0.0,"norow": "true"}
+#################################################################################################################
+        ,{"role": "input","id": "model3","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a3","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "b3","label": " ","type": "float","min": "0","norow": "true"}
+        ,{"role": "input","id": "c3","label": " ","type": "float","min": "0","norow": "true"}
+        ,{"role": "input","id": "p3","label": " ","type": "float","default": 1,"norow": "true"}
+        ,{"role": "input","id": "x3","label": " ","type": "float","default": 0.0,"norow": "true"}
+        ,{"role": "input","id": "y3","label": " ","type": "float","default": 0.0,"norow": "true"}
+        ,{"role": "input","id": "z3","label": " ","type": "float","default": 0.0,"norow": "true"}
+#################################################################################################################
+        ,{"role": "input","id": "model4","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a4","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "b4","label": " ","type": "float","min": "0","norow": "true"}
+        ,{"role": "input","id": "c4","label": " ","type": "float","min": "0","norow": "true"}
+        ,{"role": "input","id": "p4","label": " ","type": "float","default": 1,"norow": "true"}
+        ,{"role": "input","id": "x4","label": " ","type": "float","default": 0.0,"norow": "true"}
+        ,{"role": "input","id": "y4","label": " ","type": "float","default": 0.0,"norow": "true"}
+        ,{"role": "input","id": "z4","label": " ","type": "float","default": 0.0,"norow": "true"}
+#################################################################################################################
+        ,{"role": "input","id": "model5","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a5","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "b5","label": " ","type": "float","min": "0","norow": "true"}
+        ,{"role": "input","id": "c5","label": " ","type": "float","min": "0","norow": "true"}
+        ,{"role": "input","id": "p5","label": " ","type": "float","default": 1,"norow": "true"}
+        ,{"role": "input","id": "x5","label": " ","type": "float","default": 0.0,"norow": "true"}
+        ,{"role": "input","id": "y5","label": " ","type": "float","default": 0.0,"norow": "true"}
+        ,{"role": "input","id": "z5","label": " ","type": "float","default": 0.0,"norow": "true"}
+#################################################################################################################        
+        ,{
+            "role"       : "output"
+            ,"id"         : "hroutput"
+            ,"label"      : "<hr> Output files <hr>"
+            ,"type"       : "label"
+            ,"colspan"    : 2
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "pr"
+            ,"label"      : "p(r)"
+            ,"type"       : "file"
+            ,"help"       : "The calculated p(r)"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "Iq"
+            ,"label"      : "Intensity"
+            ,"type"       : "file"
+            ,"help"       : "The calculated intensity, I(q)"
+        }
+	,{
+            "role"       : "output"
+            ,"id"         : "pdb"
+            ,"label"      : "PDB file with model"
+            ,"type"       : "file"
+            ,"help"       : "PDB file of model, for visualization, e.g. in PyMOL. Alle points represented as dummy Carbon beads."
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "zip"
+            ,"label"      : "Results zipped"
+            ,"type"       : "file"
+            ,"help"       : "Results packaged in a zip file"
+        }
+	,{
+            "role"       : "output"
+            ,"id"         : "label_parameters"
+            ,"label"      : "<hr> Structural output parameters <hr>"
+            ,"type"       : "label"
+            ,"colspan"    : 2
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "Dmax"
+            ,"label"      : "Dmax, monodisperse"
+            ,"type"       : "text"
+	    ,"help"       : "Maximum distance in monodisperse particle"
+        }  
+        ,{
+            "role"       : "output"
+            ,"id"         : "Rg"
+            ,"label"      : "Rg, monodisperse"
+            ,"type"       : "text"
+            ,"help"       : "Radius of gyration of monodisperse particle"
+        }	
+       	,{
+            "role"       : "output"
+            ,"id"         : "Dmax_poly"
+            ,"label"      : "Dmax, polydisperse"
+            ,"type"       : "text"
+            ,"help"       : "Maximum distance in polydisperse sample"
+        }
+	,{
+            "role"       : "output"
+            ,"id"         : "Rg_poly"
+            ,"label"      : "Rg, polydisperse"
+            ,"type"       : "text"
+            ,"help"       : "Radius of gyration of polydisperse sample"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "fig"
+            ,"label"      : ""
+            ,"type"       : "image"
+            ,"width"      : "80%"
+        }
+    ]
+}

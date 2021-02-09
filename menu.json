@@ -1,0 +1,53 @@
+# this is a project menu file
+{
+# "header" : "WillItFit",
+ "menu" : [
+        { 
+            "id"      : "mcsim_menu",
+            "label"   : "Calculations",
+            "icon"    : "pngs/simulate.png",
+	    "autorun" : "mcsim",
+            "startup" : "true",
+            "modules" : [ 
+                         { 
+                          "id"    : "mcsim",
+                          "label" : "McSim",
+			  "nobutton" : "true"
+                         }
+                        ]
+            }
+
+           ,{ 
+            "id"         : "admin",
+            "restricted" : "admin",
+            "label"      : "Admin",
+            "icon"       : "pngs/admin.png",
+            "modules" : [ 
+                         { 
+                          "id"    : "jobmonitor",
+                          "label" : "Job monitor"
+                         }
+                         ,{ 
+                          "id"    : "sysuserslist",
+                          "label" : "Users"
+                         }
+		         ,{ 
+                          "id"    : "jobshistory_1",
+                          "label" : "Job history"
+                         }
+		
+                        ]
+            }
+
+          ,{
+              "id"      : "etc",
+              "modules" : [
+                           {
+			    "id"    : "sys_file_manager",
+			    "label" : "File manager"
+			    }
+                          ]
+	  }
+     
+    ]
+}
