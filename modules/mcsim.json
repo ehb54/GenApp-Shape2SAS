@@ -59,6 +59,17 @@
             ,"max"        : 0.9
             ,"help"       : "<p>Volume fraction - for high concentration samples.</p><p> Giving rise to a hard sphere structure factor, S(q)</p><p>Min: 0.0 (no structure factor), max: 0.9.</p>"
         }
+	,{
+            "role"       : "input"
+            ,"id"         : "noise"
+            ,"label"      : "Relative noise"
+            ,"type"       : "float"
+            ,"step"       : 0.01
+            ,"default"    : 1.0
+            ,"min"        : 0.0001
+            ,"max"        : 10000
+            ,"help"       : "<p>Relative noise on simulated data.</p><p>Min: 0.0001, max: 10000.</p><p> the error is simulated using: sigma = noise*sqrt[(10000*I)/(0.9*q)], where I,q are calculated from the p(r)</p>"
+        }
         ,{
             "role"       : "input"
             ,"id"         : "prpoints"
@@ -220,9 +231,16 @@
         ,{
             "role"       : "output"
             ,"id"         : "Iq"
-            ,"label"      : "Intensity"
+            ,"label"      : "Intensity, calculated (no errors)"
             ,"type"       : "file"
             ,"help"       : "The calculated intensity, I(q)"
+        }
+       ,{
+            "role"       : "output"
+            ,"id"         : "Isim"
+            ,"label"      : "Intensity, simulated (with errors)"
+            ,"type"       : "file"
+            ,"help"       : "<p>Simulated intensity, format: q, I(q), sigma.</p><p>sigma simulated using Sedlak et al (https://doi.org/10.1107/S1600576717003077)</p>"
         }
 	,{
             "role"       : "output"

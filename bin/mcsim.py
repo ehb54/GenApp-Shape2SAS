@@ -26,6 +26,7 @@ if __name__=='__main__':
     json_variables = json.load(argv_io_string)
     qmin = float(json_variables['qmin'])
     qmax = float(json_variables['qmax'])
+    noise = float(json_variables['noise'])
     Nbins = int(json_variables['prpoints']) # number of points in p(r)
     polydispersity = float(json_variables['polydispersity'])
     eta = float(json_variables['eta']) # volume fraction
@@ -214,9 +215,9 @@ if __name__=='__main__':
     ## make h(r)
     idx_nonzero = np.where(dist>0.0)
     Dmax = np.amax(dist)
-    sigma = polydispersity
-    factor_min = np.max([0,1-3*sigma])
-    factor_max = 1+3*sigma
+    sigma_poly = polydispersity
+    factor_min = np.max([0,1-3*sigma_poly])
+    factor_max = 1+3*sigma_poly
     Dmax_poly = Dmax*factor_max
     hr,bin_edges = np.histogram(dist,bins=Nbins,weights=contrast,range=(0,Dmax_poly)) 
     dr = bin_edges[2]-bin_edges[1]
@@ -228,7 +229,7 @@ if __name__=='__main__':
         for factor_d in factor_range:
             message.udpmessage({"_textarea":"." % factor_d})
             dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,Dmax_poly))
-            res = (1.0-factor_d)/sigma
+            res = (1.0-factor_d)/sigma_poly
             w = np.exp(-res**2/2.0) # give weight according to normal distribution
             hr_poly += dhr*w
     else:
@@ -255,11 +256,36 @@ if __name__=='__main__':
     else:
         S = np.ones(len(q))
 
-    ## save intensity to textfile
+    ## save all intensities to textfile
     with open('Iq.d','w') as f:
         f.write('# q I(q) I(q) polydisperse S(q)\n')
         for i in range(M):
             f.write('%f %f %f %f\n' % (q[i],I[i],I_poly[i],S[i]))
+
+    ## simulate exp error
+    #input, sedlak errors (https://doi.org/10.1107/S1600576717003077)
+    k = 10000
+    c = 0.85
+    if polydispersity > 0.0:
+        mu = I_poly*S
+    else:
+        mu = I*S
+    sigma = noise*np.sqrt((mu+c)/(k*q))
+
+    ##pseudo-rebin
+    Nrebin = 10 # keep every Nth point
+    mu = mu[::Nrebin]
+    qsim = q[::Nrebin]
+    sigma = sigma[::Nrebin]/np.sqrt(Nrebin)
+    
+    ## simulate data using errors
+    Isim = np.random.normal(mu,sigma)
+
+    ## save to file
+    with open('Isim.d','w') as f:
+        f.write('# Simulated data\n# sigma generated using Sedlak et al, k=10000, c=0.85, https://doi.org/10.1107/S1600576717003077, and rebinned with 10 per bin)\n# q I sigma\n')
+        for i in range(len(Isim)):
+            f.write('%f %f %f\n' % (qsim[i],Isim[i],sigma[i]))
 
     ## make p(r)
     
@@ -277,7 +303,7 @@ if __name__=='__main__':
         for factor_d in factor_range:
             message.udpmessage({"_textarea":"." % factor_d})
             dpr = histogram1d(dist_tr*factor_d,bins=Nbins,weights=contrast_tr,range=(0,Dmax_poly))
-            res = (1.0-factor_d)/sigma
+            res = (1.0-factor_d)/sigma_poly
             w = np.exp(-res**2/2.0) # give weight according to normal distribution
             pr_poly += dpr*w
     else:
@@ -333,21 +359,20 @@ if __name__=='__main__':
     if polydispersity > 0.0 and eta == 0.0:
         p5.plot(q,I,color='red',label='P(q), monodisperse')
         p5.plot(q,I_poly,linestyle='--',color='grey',label='P(q), polydisperse')
-        p5.legend()
     elif polydispersity == 0.0 and eta > 0.0:
         p5.plot(q,I,linestyle='-',color='red',label='P(q)')
         p5.plot(q,S,linestyle='-',color='black',label='S(q)')
         p5.plot(q,I*S,linestyle='--',color='blue',label='P(q)*S(q)')  
-        p5.legend()
     elif polydispersity > 0.0 and eta > 0.0:
         p5.plot(q,I,linestyle='-',color='red',label='P(q) monodisperse')
         p5.plot(q,I_poly,linestyle='-',color='grey',label='P(q), polydisperse')
         p5.plot(q,S,linestyle='-',color='black',label='S(q)')
         p5.plot(q,I*S,linestyle='--',color='blue',label='P(q)*S(q), monodisperse')
         p5.plot(q,I_poly*S,linestyle='--',color='green',label='P(q)*S(q), polydisperse')
-        p5.legend()
     else:
-        p5.plot(q,I,color='red')
+        p5.plot(q,I,color='red',label='P(q)')
+    p5.errorbar(qsim,Isim,yerr=sigma,linestyle='none',marker='.',color='lightgrey',label='I(q), simulated',zorder=0)
+    p5.legend()
 
     ## plot scattering, lin-log
     p6 = plt.subplot(2,3,6)
@@ -358,29 +383,28 @@ if __name__=='__main__':
     if polydispersity > 0.0 and eta == 0.0:
         p6.plot(q,I,color='red',label='P(q), monodisperse')
         p6.plot(q,I_poly,linestyle='--',color='grey',label='P(q), polydisperse')
-        p6.legend()
     elif polydispersity == 0.0 and eta > 0.0:
         p6.plot(q,I,linestyle='-',color='red',label='P(q)')
         p6.plot(q,S,linestyle='-',color='black',label='S(q)')
         p6.plot(q,I*S,linestyle='--',color='blue',label='P(q)*S(q)')    
-        p6.legend()
     elif polydispersity > 0.0 and eta > 0.0:
         p6.plot(q,I,linestyle='-',color='red',label='P(q) monodisperse')
         p6.plot(q,I_poly,linestyle='-',color='grey',label='P(q), polydisperse')
         p6.plot(q,S,linestyle='-',color='black',label='S(q)')
         p6.plot(q,I*S,linestyle='--',color='blue',label='P(q)*S(q), monodisperse')
         p6.plot(q,I_poly*S,linestyle='--',color='green',label='P(q)*S(q), polydisperse')
-        p6.legend()
     else:
-        p6.plot(q,I,color='red')
-        
+        p6.plot(q,I,color='red',label='P(q)')
+    p6.errorbar(qsim,Isim,yerr=sigma,linestyle='none',marker='.',color='lightgrey',label='I(q), simulated',zorder=0)
+    p6.legend()
+
     ## figure settings
     plt.tight_layout()
     plt.savefig('plot.png')
     plt.close()
 
     ## compress output files to zip file
-    os.system('zip results.zip pr.d Iq.d model.pdb plot.png')
+    os.system('zip results.zip pr.d Iq.d Isim.d model.pdb plot.png')
 
     time_output = time.time()-start_output
     message.udpmessage({"_textarea":"    time output: %1.2f sec\n" % time_output}) 
@@ -393,6 +417,7 @@ if __name__=='__main__':
     output = {} # create an empty python dictionary
     output["pr"] = "%s/pr.d" % folder
     output["Iq"] = "%s/Iq.d" % folder
+    output["Isim"] = "%s/Isim.d" % folder
     output["pdb"] = "%s/model.pdb" % folder
     output["fig"] = "%s/plot.png" % folder
     output["zip"] = "%s/results.zip" % folder
@@ -401,6 +426,10 @@ if __name__=='__main__':
     if polydispersity > 0.0:
         output["Dmax_poly"] = "%1.2f" % Dmax_poly 
         output["Rg_poly"] = "%1.2f" % Rg_poly
+    else:
+        output["Dmax_poly"] = "N/A"
+        output["Rg_poly"] = "N/A"
+
     #output['_textarea'] = "JSON output from executable:\n" + json.dumps( output, indent=4 ) + "\n\n";
     #output['_textarea'] += "JSON input to executable:\n" + json.dumps( json_variables, indent=4 ) + "\n";
 
