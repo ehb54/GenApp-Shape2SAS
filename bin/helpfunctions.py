@@ -7,6 +7,72 @@ def sinc(x):
     """
     return np.sinc(x/np.pi)   
 
+def get_volume(model,a,b,c):
+    """ 
+    calculates volume for a given object
+    """
+    Volume = 0.0
+
+    if model in ['sphere','hollow_sphere']:
+        SHELL=False
+        if model == 'hollow_sphere':
+            if b > a:
+                R,r = b,a
+            elif b == a:
+                SHELL=True
+                R = a # do not use r
+            else:
+                R,r = a,b
+        else:
+            R,r = a,0
+        if SHELL:
+            Area = 4*np.pi*R**2
+            Volume = Area # need a volume for calculating rho
+        else:
+            Volume = 4*np.pi*(R**3-r**3)/3
+        
+    if model == 'ellipsoid':
+        Volume = 4*np.pi*a*b*c/3
+        
+    if model in ['cylinder','disc']:
+        l = c
+        Volume = np.pi*a*b*l
+
+    if model in ['cube','hollow_cube']:
+        SHELL = False
+        if model == 'hollow_cube':
+            if b > a:
+                a,b = b,a
+            elif b == a:
+                SHELL = True
+        else:
+            b = 0
+        if SHELL:
+            Area = 6*a**2
+            Volume = Area # need a volume for calculating rho
+        else:
+            Volume = a**3 - b**3
+
+    if model == 'cuboid':
+        Volume = a*b*c
+
+    if model in ['cyl_ring','disc_ring']:
+        SHELL = False
+        if b > a:
+            R,r,l = b,a,c
+        elif b == a:
+            SHELL = True
+            R,l = a,c # do not use r
+        else:
+            R,r,l = a,b,c
+        if SHELL:
+            Area      = 2*np.pi*R*l
+            Volume    = Area # need a volume for calculating rho
+        else:
+            Volume = np.pi*(R**2-r**2)*l
+    
+    return Volume
+
 def genpoints(x_new,y_new,z_new,p_new,x_com,y_com,z_com,model,a,b,c,p,Npoints):
     """ 
     generate random uniformly distributed points (x,y,z) and adds them to vectors x_new,y_new,z_new
@@ -216,7 +282,8 @@ def calc_S(q,R,eta):
     R  : hard-sphere radius
     eta: volume fraction
     """
-    A = 2*R*q
+    A = 2*R*q 
+    #A = R*q # according to Pedersen1997
     G = calc_G(A,eta)
     S = 1/(1 + 24*eta*G/A)
     return S
@@ -224,15 +291,19 @@ def calc_S(q,R,eta):
 def calc_G(A,eta):
     """ 
     calculate G in the hard-sphere potential
+    A  : 2*R*q
     q  : momentum transfer
     R  : hard-sphere radius
     eta: volume fraction
     """
     a = (1+2*eta)**2/(1-eta)**4
-    b = -6*eta*(1+eta/2)**2/(1-eta)**4
+    b = -6*eta*(1+eta/2)**2/(1-eta)**4 
+    #b = -6*eta*(1+eta/2)**2/(1-eta)**2 # according to Pedersen1997
     c = eta * a/2
-    fa = np.sin(A)-A*np.cos(A)
-    fb = 2*A*np.sin(A)+(2-A**2)*np.cos(A)-2
-    fc = -A**4*np.cos(A) + 4*((3*A**2-6)*np.cos(A)+(A**3-6*A)*np.sin(A)+6)
+    sinA = np.sin(A)
+    cosA = np.cos(A)
+    fa = sinA-A*cosA
+    fb = 2*A*sinA+(2-A**2)*cosA-2
+    fc = -A**4*cosA + 4*((3*A**2-6)*cosA+(A**3-6*A)*sinA+6)
     G = a*fa/A**2 + b*fb/A**3 + c*fc/A**5
     return G

@@ -10,7 +10,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 import subprocess
-from helpfunctions import sinc,genpoints,calc_dist,calc_Rg,calc_S
+from helpfunctions import sinc,get_volume,genpoints,calc_dist,calc_Rg,calc_S
 import time
 from fast_histogram import histogram1d #histogram1d from fast_histogram is faster than np.histogram (https://pypi.org/project/fast-histogram/) 
 import gc # garbage collector for freeing memory
@@ -26,10 +26,12 @@ if __name__=='__main__':
     json_variables = json.load(argv_io_string)
     qmin = float(json_variables['qmin'])
     qmax = float(json_variables['qmax'])
+    Nq = int(json_variables['qpoints']) # number of points in (simulated) q
     noise = float(json_variables['noise'])
     Nbins = int(json_variables['prpoints']) # number of points in p(r)
     polydispersity = float(json_variables['polydispersity'])
     eta = float(json_variables['eta']) # volume fraction
+    sigma_r = float(json_variables['sigma_r']) # interface roughness
     folder = json_variables['_base_directory'] # output folder dir
     N_poly_integral = 9 # number of steps in polydispersity integral
 
@@ -67,15 +69,12 @@ if __name__=='__main__':
         try:
             c.append(float(json_variables[c_name]))
         except:
-            #if model[i] in ['sphere','cube','hollow_sphere','hollow_cube','none']: 
-            #    c.append(0.0)
             if model[i] in ['ellipsoid','cylinder','cuboid','cyl_ring']:
                 c.append(4*a[i])
             elif model[i] in ['disc','disc_ring']:
                 c.append(0.5*a[i])
             else:
                 c.append(0.0)
-                #message.udpmessage({"_textarea":"no default setting for model %s\n" % model[i] })
         try: 
             p.append(float(json_variables[p_name]))
         except:
@@ -100,12 +99,23 @@ if __name__=='__main__':
 #    message.udpmessage({"_textarea":"y = [%f,%f,%f,%f]\n" % (y[0],y[1],y[2],y[3]) })
 #    message.udpmessage({"_textarea":"z = [%f,%f,%f,%f]\n" % (z[0],z[1],z[2],z[3]) })
 
-    ## adjust number of points, to maximum is 3,000
+    ## adjust number of points, total is no more than 3,500
     count = 0
+    sum_vol = 0
+    r_eff_sum = 0
+    volume = []
     for i in range(Number_of_models):
-        if model[i] != 'none': count += 1
-    Npoints_max = 3500
-    Npoints = int(Npoints_max/count)
+        v = get_volume(model[i],a[i],b[i],c[i])
+        r = (3*v/(4*np.pi))**(1./3.)
+        #message.udpmessage({"_textarea":"\n\n    i: %d, v: %1.2f, r: %1.2f\n" % (i,v,r)})
+        volume.append(v)
+        sum_vol += v
+        if model[i] != 'none': 
+            count += 1
+            r_eff_sum += r
+    r_eff = r_eff_sum/count
+    Npoints_max = 4000
+    #message.udpmessage({"_textarea":"\n\n    count: %d\n" % (count)})
     
     ## generate points
     start_points = time.time()
@@ -114,6 +124,7 @@ if __name__=='__main__':
     x_new,y_new,z_new,p_new = 0,0,0,0
     for i in range(Number_of_models):
         if model[i] != 'none': 
+            Npoints = int(Npoints_max * volume[i]/sum_vol)
             #message.udpmessage({"_textarea":"i,x[i],y[i],z[i],model[i],a[i],b[i],c[i],p[i],Npoints = %d,%f,%f,%f,%s,%f,%f,%f,%f,%d\n" % (i,x[i],y[i],z[i],model[i],a[i],b[i],c[i],p[i],Npoints) })
             x_new,y_new,z_new,p_new,N,rho = genpoints(x_new,y_new,z_new,p_new,x[i],y[i],z[i],model[i],a[i],b[i],c[i],p[i],Npoints)
             srho = rho*p[i]
@@ -132,10 +143,16 @@ if __name__=='__main__':
     lim = [-max_l,max_l]
 
     ## figure
+    #indices of negatative contrast
+    idx_neg = np.where(p_new<0.0)
+    idx_pos = np.where(p_new>0.0)
+    idx_nul = np.where(p_new==0.0)
     plt.figure(figsize=(15,10))
     markersize = 3
     p1 = plt.subplot(2,3,1)
-    p1.plot(x_new,z_new,linestyle='none',marker='.',markersize=markersize,color='red')
+    p1.plot(x_new[idx_pos],z_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color='red')
+    p1.plot(x_new[idx_neg],z_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
+    p1.plot(x_new[idx_nul],z_new[idx_nul],linestyle='none',marker='.',markersize=markersize,color='grey')
     p1.set_xlim(lim)
     p1.set_ylim(lim)
     p1.set_xlabel('x')
@@ -143,7 +160,9 @@ if __name__=='__main__':
     p1.set_title('pointmodel, (x,z), "front"')
 
     p2 = plt.subplot(2,3,2)
-    p2.plot(y_new,z_new,linestyle='none',marker='.',markersize=markersize,color='red')
+    p2.plot(y_new[idx_pos],z_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color='red')
+    p2.plot(y_new[idx_neg],z_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
+    p2.plot(y_new[idx_nul],z_new[idx_nul],linestyle='none',marker='.',markersize=markersize,color='grey')    
     p2.set_xlim(lim)
     p2.set_ylim(lim)
     p2.set_xlabel('y')
@@ -151,7 +170,9 @@ if __name__=='__main__':
     p2.set_title('pointmodel, (y,z), "side"')
 
     p3 = plt.subplot(2,3,3)
-    p3.plot(x_new,y_new,linestyle='none',marker='.',markersize=markersize,color='red')
+    p3.plot(x_new[idx_pos],y_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color='red')
+    p3.plot(x_new[idx_neg],y_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
+    p3.plot(x_new[idx_nul],y_new[idx_nul],linestyle='none',marker='.',markersize=markersize,color='grey')    
     p3.set_xlim(lim)
     p3.set_ylim(lim)
     p3.set_xlabel('x')
@@ -166,7 +187,8 @@ if __name__=='__main__':
         f.write('REMARK   CARBON, C: POSITIVE EXCESS SCATTERING LENGTH\n')
         f.write('REMARK   CARBON, H: ZERO EXCESS SCATTERING LENGTH\n')
         f.write('REMARK   CARBON, O: NEGATIVE EXCESS SCATTERING LENGTH\n')
-        f.write('REMARK   SCATTERING LENGTH DENSITY INFORMATION NOT INCLUDED\n')
+        f.write('REMARK   ACCURATE SCATTERING LENGTH DENSITY INFORMATION NOT INCLUDED\n')
+        f.write('REMARK   OBS: WILL NOT GIVE CORRECT RESULTS IF SCATTERING IS CALCULATED FROM THIS MODEL WITH E.G CRYSOL, PEPSI-SAXS, FOXS, CAPP OR THE LIKE!\n')
         f.write('REMARK   ONLY FOR VISUALIZATION, E.G. WITH PYMOL\n')
         f.write('REMARK    \n')
         for i in range(len(x_new)):
@@ -212,49 +234,61 @@ if __name__=='__main__':
     start_pr = time.time()
     message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)..."})
     
+    ## generate q
+    M = 10*Nq
+    q = np.linspace(qmin,qmax,M)
+
     ## make h(r)
     idx_nonzero = np.where(dist>0.0)
     Dmax = np.amax(dist)
-    sigma_poly = polydispersity
-    factor_min = np.max([0,1-3*sigma_poly])
-    factor_max = 1+3*sigma_poly
-    Dmax_poly = Dmax*factor_max
+    Dmax_poly = Dmax*(1+3*polydispersity)
     hr,bin_edges = np.histogram(dist,bins=Nbins,weights=contrast,range=(0,Dmax_poly)) 
     dr = bin_edges[2]-bin_edges[1]
     r = bin_edges[0:-1]+dr/2
     del bin_edges,dr
-    if polydispersity > 0.0:
-        hr_poly = 0.0
-        factor_range = np.linspace(factor_min,factor_max,N_poly_integral)
-        for factor_d in factor_range:
-            message.udpmessage({"_textarea":"." % factor_d})
-            dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,Dmax_poly))
-            res = (1.0-factor_d)/sigma_poly
-            w = np.exp(-res**2/2.0) # give weight according to normal distribution
-            hr_poly += dhr*w
-    else:
-        hr_poly = hr
-    
-    ## calculate scattering
-    M = 1000
-    q = np.linspace(qmin,qmax,M)
 
-    I,I_poly = 0.0,0.0
+    # monodisperse intensity
+    I = 0.0 
     for i in range(Nbins):
         qr = q*r[i]
         I += hr[i]*sinc(qr)
-        I_poly += hr_poly[i]*sinc(qr)
-
     I /= np.amax(I)
-    I_poly /= np.amax(I_poly)
+    del hr
 
-    del hr,hr_poly
+    # polydisperse intensity
+    if polydispersity > 0.0:
+        I_poly = 0.0
+        factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
+        for factor_d in factor_range:
+            dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,Dmax_poly))
+            res = (1.0-factor_d)/polydispersity
+            w = np.exp(-res**2/2.0) # give weight according to normal distribution
+            #vol = factor_d**3 # relative volume
+            #hr_poly += dhr*(w*vol)**2
+            dI = 0.0
+            for i in range(Nbins):
+                qr = q*r[i]
+                dI += dhr[i]*sinc(qr)
+            dI /= np.amax(dI)
+            I_poly += w*dI
+            message.udpmessage({"_textarea":"."})
+        I_poly /= np.amax(I_poly)
+        del dhr
+    else:
+        I_poly = I
+
     
     if eta > 0.0:
-        R = np.mean(a) # very rough approximation, that the effective radius equals mean of a for the different particles
-        S = calc_S(q,R,eta)
+        #message.udpmessage({"_textarea":"\n\n    R: %1.2f, eta: %1.2f\n" % (r_eff,eta)})
+        S = calc_S(q,r_eff,eta)
     else:
         S = np.ones(len(q))
+    
+    ## interface roughness (Skar-Gislinge et al. DOI: 10.1039/c0cp01074j)
+    if sigma_r > 0.0:
+        roughness = np.exp(-(q*sigma_r)**2/2)
+        I *= roughness
+        I_poly *= roughness
 
     ## save all intensities to textfile
     with open('Iq.d','w') as f:
@@ -297,34 +331,39 @@ if __name__=='__main__':
     contrast_tr = contrast[idx_nonzero]
     del contrast
     pr = histogram1d(dist_tr,bins=Nbins,weights=contrast_tr,range=(0,Dmax_poly))
+    
     if polydispersity > 0.0:
         pr_poly = 0.0
-        factor_range = np.linspace(factor_min,factor_max,N_poly_integral)
+        factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
         for factor_d in factor_range:
-            message.udpmessage({"_textarea":"." % factor_d})
             dpr = histogram1d(dist_tr*factor_d,bins=Nbins,weights=contrast_tr,range=(0,Dmax_poly))
-            res = (1.0-factor_d)/sigma_poly
+            res = (1.0-factor_d)/polydispersity
             w = np.exp(-res**2/2.0) # give weight according to normal distribution
-            pr_poly += dpr*w
+            vol = factor_d**3 # give weight according to (relative) volume square
+            pr_poly += dpr*w*vol
+            message.udpmessage({"_textarea":"."})
     else:
         pr_poly = pr
+    
+    message.udpmessage({"_textarea":".\n"})
     del dist_tr,contrast_tr
-
+   
     ## normalize so pr_max = 1 
     pr /= np.amax(pr) 
     pr_poly /= np.amax(pr_poly)
 
-    message.udpmessage({"_textarea":".\n"})
 
     ## save p(r) to textfile
     with open('pr.d','w') as f:
-        f.write('#  r p(r) p(r) polydisperse\n')
+        #f.write('#  r p(r) p(r) polydisperse\n')
+        f.write('#  r p(r) p_polydisperse(r)\n')
         for i in range(Nbins):
             f.write('%f %f %f\n' % (r[i],pr[i],pr_poly[i]))
 
     # calculate Rg
     Rg = calc_Rg(r,pr)
     Rg_poly = calc_Rg(r,pr_poly)
+    #Rg_poly = calc_Rg(r,pr)
 
     time_pr = time.time() - start_pr
     message.udpmessage({"_textarea":"    Dmax              = %1.2f\n" % Dmax})
@@ -342,7 +381,7 @@ if __name__=='__main__':
     p4 = plt.subplot(2,3,4)
     #p4.plot(r,hr,color='green')
     p4.plot(r,pr,color='red',label='p(r), monodisperse')
-    p4.set_xlabel('r')
+    p4.set_xlabel('r [Angstrom]')
     p4.set_ylabel('p(r)')
     p4.set_title('Pair distribution funciton, p(r)')
     if polydispersity > 0.0:
@@ -353,7 +392,7 @@ if __name__=='__main__':
     p5 = plt.subplot(2,3,5)
     p5.set_xscale('log')
     p5.set_yscale('log')
-    p5.set_xlabel('q')
+    p5.set_xlabel('q [1/Angstrom]')
     p5.set_ylabel('I(q)')
     p5.set_title('Scattering, log-log scale')
     if polydispersity > 0.0 and eta == 0.0:
@@ -435,4 +474,3 @@ if __name__=='__main__':
 
     ## send output
     print( json.dumps(output) ) # convert dictionary to json and output
-

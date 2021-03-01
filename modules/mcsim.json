@@ -24,9 +24,9 @@
             ,"id"         : "qmin"
             ,"label"      : "q min"
             ,"type"       : "float"
-            ,"step"       : 0.001
-	    ,"default"    : 0.01
-            ,"help"       : "q min in inverse Angstroms."
+            ,"step"       : 0.01
+	    ,"default"    : 0.001
+            ,"help"       : "q min, in inverse Angstroms"
         }
         ,{
             "role"       : "input"
@@ -35,7 +35,17 @@
             ,"type"       : "float"
             ,"step"       : 0.001
 	    ,"default"    : 1.0
-            ,"help"       : "q max in inverse Angstroms."
+            ,"help"       : "q max, in inverse Angstrom"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "qpoints"
+            ,"label"      : "Number of points in q"
+            ,"type"       : "integer"
+            ,"min"        : 10
+            ,"default"    : 100
+            ,"max"        : 2000
+            ,"help"       : "<p>Number of points in q.</p><p>Default: 100, Minimum 10, Maximum 2000</p>"
         }
         ,{
             "role"       : "input"
@@ -59,6 +69,17 @@
             ,"max"        : 0.9
             ,"help"       : "<p>Volume fraction - for high concentration samples.</p><p> Giving rise to a hard sphere structure factor, S(q)</p><p>Min: 0.0 (no structure factor), max: 0.9.</p>"
         }
+        ,{
+            "role"       : "input"
+            ,"id"         : "sigma_r"
+            ,"label"      : "Interface roughness, in Aangstrom"
+            ,"type"       : "float"
+            ,"step"       : 0.01
+            ,"default"    : 0.0
+            ,"min"        : 0.0
+            ,"max"        : 10.0
+            ,"help"       : "<p>Interface roughness, for non-sharp edges between models. </p> See Skar-Gislinge et al, PhysChemChemPhys 2011: Small-angle scattering from phospholipid nanodiscs: derivation and refinement of a molecular constrained analytical model form factor. </p><p> Decreasing scattering at high q, by I(q) = I(q)*exp(-(q*sigma_r)^2/2)</p><p>Min: 0.0 (no roughness), max: 10, default: none.</p>"
+        }
 	,{
             "role"       : "input"
             ,"id"         : "noise"
@@ -78,7 +99,7 @@
             ,"min"        : 10
             ,"default"    : 100
             ,"max"        : 200
-            ,"help"       : "<p>Optionally enter the number of points in the estimated function p(r).</p><p>Default: 100, Minimum 10, Maximum 200</p>"
+            ,"help"       : "<p>Number of points in the estimated function p(r).</p><p>Default: 100, Minimum 10, Maximum 200</p>"
         }
         ,{
             "role"       : "input"
@@ -129,11 +150,11 @@
             ,"id"         : "label_p"
             ,"label"      : " "
             ,"type"       : "text"
-            ,"default"    : "Delta SL"
+            ,"default"    : "Delta SLD"
             ,"norow"      : "true"
             ,"readonly"   : "true"
             ,"size"       : 20
-            ,"help"       : "Excess scattering length per point in object"
+            ,"help"       : "Excess scattering length density of object"
         }
 	,{
             "role"       : "input"
@@ -170,7 +191,7 @@
         }
 #################################################################################################################       
         ,{"role": "input","id": "model1","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring","norow": "true","size": 30,"default": "sphere"}
-        ,{"role": "input","id": "a1","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "a1","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b1","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c1","label": " ","type": "float","min": "0","norow": "true"}
 	,{"role": "input","id": "p1","label": " ","type": "float","default": 1,"norow": "true"}
@@ -179,7 +200,7 @@
 	,{"role": "input","id": "z1","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################       
         ,{"role": "input","id": "model2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a2","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "a2","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p2","label": " ","type": "float","default": 1,"norow": "true"}
@@ -188,7 +209,7 @@
         ,{"role": "input","id": "z2","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################
         ,{"role": "input","id": "model3","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a3","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "a3","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b3","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c3","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p3","label": " ","type": "float","default": 1,"norow": "true"}
@@ -197,7 +218,7 @@
         ,{"role": "input","id": "z3","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################
         ,{"role": "input","id": "model4","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a4","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "a4","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b4","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c4","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p4","label": " ","type": "float","default": 1,"norow": "true"}
@@ -206,7 +227,7 @@
         ,{"role": "input","id": "z4","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################
         ,{"role": "input","id": "model5","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a5","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "a5","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b5","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c5","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p5","label": " ","type": "float","default": 1,"norow": "true"}
@@ -247,7 +268,7 @@
             ,"id"         : "pdb"
             ,"label"      : "PDB file with model"
             ,"type"       : "file"
-            ,"help"       : "PDB file of model, for visualization, e.g. in PyMOL. Alle points represented as dummy Carbon beads."
+            ,"help"       : "<p>PDB file of model, for visualization, e.g. in PyMOL.</p><p> All points represented as dummy Carbon beads (positive SLD), dummy Oxygen beads (negative SLD) or dummy Hydrogen beads (zero SLD).</p><p> WARNING: The model will not give correct scattering if used as input in, e.g., CRYSOL, PEPSI-SAXS, FOXS, CAPP, etc - it is only for vizualization</p>."
         }
         ,{
             "role"       : "output"
@@ -290,6 +311,14 @@
             ,"label"      : "Rg, polydisperse"
             ,"type"       : "text"
             ,"help"       : "Radius of gyration of polydisperse sample"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "label_fig"
+            ,"label"      : "<p><hr> Plots of model, p(r) and scattering <hr></p><p>Upper panel: Model(s) from different angles (red dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: p(r), I(q) on log-log and log-lin scale. </p>"
+            ,"type"       : "label"
+            ,"colspan"    : 2
+            ,"help"       : "<p>Upper panel: Model(s) from different angles (red dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: p(r), I(q) on log-log and log-lin scale. </p>"
         }
         ,{
             "role"       : "output"
