@@ -162,7 +162,6 @@ if __name__=='__main__':
     
     ## calculate intensity 
     Dmax,Dmax_poly,I_poly,S,I,q,r,Rg_no_contrast = calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r)
-    message.udpmessage({"_textarea":"\n# Rg_no_contrast = %f \n" % Rg_no_contrast})
 
     ## simulate data
     qsim,Isim,sigma = simulate_data(polydispersity,I_poly,S,I,noise,q)

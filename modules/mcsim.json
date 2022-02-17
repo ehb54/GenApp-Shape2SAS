@@ -15,7 +15,7 @@
             ,"type"      : "label"
             ,"colspan"   : 3
             ,"default"   : "header3"
-            ,"label"     : "McSim [<a target=_blank href=https://doi.org/10.1107/S1600576714013156>1,</a><a target=_blank href=http://scripts.iucr.org/cgi-bin/paper?S0021889890002801>2,</a><a target=_blank href=https://github.com/andreashlarsen/McSim/blob/main/README.md>Source code</a>]"	   
+            ,"label"     : "McSim [<a target=_blank href=https://doi.org/10.1107/S1600576714013156>1,</a><a target=_blank href=http://scripts.iucr.org/cgi-bin/paper?S0021889890002801>2,</a><a target=_blank href=https://github.com/ehb54/GenApp-McSim>Source code</a>]"	   
             ,"prehline"  : "true"
             ,"posthline" : "true"
         }
