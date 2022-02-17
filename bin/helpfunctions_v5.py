@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from fast_histogram import histogram1d #histogram1d from fast_histogram is faster than np.histogram (https://pypi.org/project/fast-histogram/) 
 
 def sinc(x):
     """
@@ -75,7 +74,7 @@ def get_volume(model,a,b,c):
     
     return Volume
 
-def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
+def genpoints(x_com,y_com,z_com,model,a,b,c,p,Npoints):
     """ 
     generate random uniformly distributed points (x,y,z) in user-defined shape
     model defines the shape in which the points should be placed
@@ -243,64 +242,6 @@ def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
      
     return x_add,y_add,z_add,p_add,N_add,rho 
 
-def gen_all_points(Number_of_models,x_com,y_com,z_com,model,a,b,c,p,exclude_overlap):
-    """
-    generate points from a collection of shapes
-    calling gen_points() for each shape
-
-    input:
-    x_com,y_com,z_com : center of mass coordinates
-    a,b,c  : model params (see GUI)
-    p      : contrast for each model
-    exclude_overlap : if True, points is removed from overlapping regions (True/False)
-
-    output:
-    N         : number of points in each model (before optional exclusion, see N_exclude)
-    rho       : density of points for each model
-    N_exclude : number of points excluded from each model (due to overlapping regions)
-    x_new,y_new,z_new : coordinates of generated points
-    p_new     : contrasts for each point 
-    volume    : volume of each model 
-    """
-
-    ## Total number of points should not exceed N_points_max (due to memory limitations). This number is system-dependent
-    N_points_max = 4000        
-    
-    ## calculate volume and sum of volume (for calculating the number of points in each shape)
-    volume = []
-    sum_vol = 0
-    for i in range(Number_of_models):
-        v = get_volume(model[i],a[i],b[i],c[i])
-        volume.append(v)
-        sum_vol += v
-
-    ## generate points
-    N,rho,N_exclude = [],[],[]
-    x_new,y_new,z_new,p_new = 0,0,0,0
-    for i in range(Number_of_models):
-        if model[i] != 'none': 
-            Npoints = int(N_points_max * volume[i]/sum_vol)
-            
-            ## generate points
-            x_add,y_add,z_add,p_add,N_model,rho_model = gen_points(x_com[i],y_com[i],z_com[i],model[i],a[i],b[i],c[i],p[i],Npoints)
-
-            ## exclude overlap region (optional)
-            N_x_sum = 0
-            if exclude_overlap:
-                for j in range(i):
-                    x_add,y_add,z_add,p_add,N_x = check_overlap(x_add,y_add,z_add,p_add,x_com[j],y_com[j],z_com[j],model[j],a[j],b[j],c[j])
-                    N_x_sum += N_x
-            
-            ## append points to vector
-            x_new,y_new,z_new,p_new = append_points(x_new,y_new,z_new,p_new,x_add,y_add,z_add,p_add)
-
-            ## append to lists
-            N.append(N_model)
-            rho.append(rho_model)
-            N_exclude.append(N_x_sum)
-
-    return N,rho,N_exclude,volume,x_new,y_new,z_new,p_new
-
 def append_points(x_new,y_new,z_new,p_new,x_add,y_add,z_add,p_add):
     """
     append new points to vectors of point coordinates
@@ -407,33 +348,7 @@ def calc_dist(x):
     # mesh this array so that you will have all combinations
     m,n = np.meshgrid(x,x,sparse=True)
     # get the distance via the norm
-    dist = abs(m-n) 
-    
-    return dist
-
-def calc_all_dist(x_new,y_new,z_new):
-    """ 
-    calculate all pairwise distances
-    """
-    square_sum = 0.0
-    for arr in [x_new,y_new,z_new]:
-        square_sum += calc_dist(arr)**2
-    d = np.sqrt(square_sum)
-    dist = d.reshape(-1)  # reshape is slightly faster than flatten() and ravel()
-    dist = dist.astype('float32')
-
-    return dist
-
-def calc_all_contrasts(p_new):
-    """
-    calculate all pairwise contrast products
-    p_new: all contrasts 
-    """
-    dp = np.outer(p_new,p_new)
-    contrast = dp.reshape(-1)
-    contrast = contrast.astype('float32')
-    
-    return contrast
+    return abs(m-n)
 
 def generate_hr(dist,polydispersity,Nbins,contrast):
     """
@@ -466,12 +381,12 @@ def calc_Rg(r,pr):
 def calc_S(q,R,eta):
     """
     calculate the hard-sphere potential
-    q       : momentum transfer
-    R       : estimation of the hard-sphere radius
-    eta     : volume fraction
+    q  : momentum transfer
+    R  : hard-sphere radius
+    eta: volume fraction
     """
-
     if eta > 0.0:
+        S = calc_S(q,r_eff,eta)
         A = 2*R*q 
         G = calc_G(A,eta)
         S = 1/(1 + 24*eta*G/A)
@@ -498,72 +413,6 @@ def calc_G(A,eta):
     fc = -A**4*cosA + 4*((3*A**2-6)*cosA+(A**3-6*A)*sinA+6)
     G = a*fa/A**2 + b*fb/A**3 + c*fc/A**5
     return G
-
-def calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r):
-    
-    """
-    calculates intensity using histogram, h(r) - like p(r) but with self-terms
-    """
-
-    ## make h(r): histogram of all distances weighted with contrasts
-    r,hr,Dmax,Dmax_poly = generate_hr(dist,polydispersity,Nbins,contrast)
-    Rg = calc_Rg(r,hr) 
-    
-    ## generate q
-    M = 10*Nq
-    q = np.linspace(qmin,qmax,M)
-
-    # monodisperse intensity
-    I = 0.0 
-    for i in range(Nbins):
-        qr = q*r[i]
-        I += hr[i]*sinc(qr)
-    I /= np.amax(I)
-    del hr
-
-    # polydisperse intensity
-    N_poly_integral = 9 # number of steps in polydispersity integral
-    if polydispersity > 0.0:
-        I_poly = 0.0
-        factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
-        for factor_d in factor_range:
-            # histogram1d is faster than np.histogram (used in generate_hr()), but does not provide r. r is not needed here.
-            dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,Dmax_poly))
-            res = (1.0-factor_d)/polydispersity
-            w = np.exp(-res**2/2.0) # weight: normal distribution
-            vol = factor_d**3 # weight: relative volume
-            dI = 0.0
-            for i in range(Nbins):
-                qr = q*r[i]
-                dI += dhr[i]*sinc(qr)
-            dI /= np.amax(dI)
-            I_poly += dI*w*vol**2
-        I_poly /= np.amax(I_poly)
-        del dhr
-    else:
-        I_poly = I
-
-    ## estimate hard-sphere radius by non-contrast weighted Rg (assume spherical shape)
-    hist_no_contrast = histogram1d(dist,bins=Nbins,range=(0,Dmax_poly))
-    Rg_no_contrast = calc_Rg(r,hist_no_contrast)
-    R_HS = np.sqrt(5./3.*Rg_no_contrast)
-
-    ## calculate (hard-sphere) structure factor 
-    S = calc_S(q,R_HS,eta)
-    
-    ## interface roughness (Skar-Gislinge et al. DOI: 10.1039/c0cp01074j)
-    if sigma_r > 0.0:
-        roughness = np.exp(-(q*sigma_r)**2/2)
-        I *= roughness
-        I_poly *= roughness
-
-    ## save all intensities to textfile
-    with open('Iq.d','w') as f:
-        f.write('# q I(q) I(q) polydisperse S(q)\n')
-        for i in range(M):
-            f.write('%f %f %f %f\n' % (q[i],I[i],I_poly[i],S[i]))
-    
-    return Dmax,Dmax_poly,I_poly,S,I,q,r,Rg_no_contrast
 
 def simulate_data(polydispersity,I_poly,S,I,noise,q):
 
@@ -594,60 +443,6 @@ def simulate_data(polydispersity,I_poly,S,I,noise,q):
     
     return qsim,Isim,sigma
 
-def calc_pr(dist,Nbins,contrast,Dmax_poly,polydispersity,r):
-    """
-    calculate p(r)
-    p(r) is the contrast-weighted histogram of distances, without the self-terms (dist = 0)
-    due to lack of self-terms it is not used to calc scattering (fast Debye by histogram), but used for structural interpretation
-    
-    input: 
-    dist      : all pairwise distances
-    contrast  : all pair-wise contrast products
-    Dmax_poly : Dmax for polydisperse ensemble
-    polydispersity: boolian, True or False
-    r         : pair distances of bins
-
-    output:
-    pr        : pair distance distribution function (PDDF) for monodisperse shape
-    pr_poly   : PDDF for polydisperse ensemble
-    """
-    ## remove non-zero elements (tr for truncate)
-    idx_nonzero = np.where(dist>0.0)
-    dist_tr = dist[idx_nonzero]
-    del dist # less memory consumption 
-
-    contrast_tr = contrast[idx_nonzero]
-    del contrast # less memory consumption 
-    
-    # calculate monodisperse p(r)
-    pr = histogram1d(dist_tr,bins=Nbins,weights=contrast_tr,range=(0,Dmax_poly))
-    
-    ## calculate polydisperse p(r)
-    N_poly_integral = 9
-    if polydispersity > 0.0:
-        pr_poly = 0.0
-        factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
-        for factor_d in factor_range:
-            dpr = histogram1d(dist_tr*factor_d,bins=Nbins,weights=contrast_tr,range=(0,Dmax_poly))
-            res = (1.0-factor_d)/polydispersity
-            w = np.exp(-res**2/2.0) # weight: normal distribution
-            vol = factor_d**3 # weight: relative volume, because larger particles scatter more
-            pr_poly += dpr*w*vol**2
-    else:
-        pr_poly = pr
-    
-    ## normalize so pr_max = 1 
-    pr /= np.amax(pr) 
-    pr_poly /= np.amax(pr_poly)
-    
-    ## save p(r) to textfile
-    with open('pr.d','w') as f:
-        f.write('#  r p(r) p_polydisperse(r)\n')
-        for i in range(Nbins):
-            f.write('%f %f %f\n' % (r[i],pr[i],pr_poly[i]))
-    
-    return pr,pr_poly
-
 def plot_2D(x_new,y_new,z_new,p_new):
     """
     plot 2D-projections of generated points (shapes) using matplotlib:
@@ -666,16 +461,13 @@ def plot_2D(x_new,y_new,z_new,p_new):
     max_l = np.amax([max_x,max_y,max_z])
     lim = [-max_l,max_l]
 
-    ## find indices of positive, zero and negatative contrast
+    ## figure
+    #indices of negatative contrast
     idx_neg = np.where(p_new<0.0)
     idx_pos = np.where(p_new>0.0)
     idx_nul = np.where(p_new==0.0)
-    
-    ## figure settings
     plt.figure(figsize=(15,10))
     markersize = 3
-
-    ## plot, perspective 1
     p1 = plt.subplot(2,3,1)
     p1.plot(x_new[idx_pos],z_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color='red')
     p1.plot(x_new[idx_neg],z_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
@@ -686,7 +478,6 @@ def plot_2D(x_new,y_new,z_new,p_new):
     p1.set_ylabel('z')
     p1.set_title('pointmodel, (x,z), "front"')
 
-    ## plot, perspective 2
     p2 = plt.subplot(2,3,2)
     p2.plot(y_new[idx_pos],z_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color='red')
     p2.plot(y_new[idx_neg],z_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
@@ -697,7 +488,6 @@ def plot_2D(x_new,y_new,z_new,p_new):
     p2.set_ylabel('z')
     p2.set_title('pointmodel, (y,z), "side"')
 
-    ## plot, perspective 3
     p3 = plt.subplot(2,3,3)
     p3.plot(x_new[idx_pos],y_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color='red')
     p3.plot(x_new[idx_neg],y_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
@@ -718,6 +508,7 @@ def plot_results(r,pr,pr_poly,q,I,I_poly,S,qsim,Isim,sigma,polydispersity,eta):
 
     ## plot p(r)
     p4 = plt.subplot(2,3,4)
+    #p4.plot(r,hr,color='green')
     p4.plot(r,pr,color='red',label='p(r), monodisperse')
     p4.set_xlabel('r [Angstrom]')
     p4.set_ylabel('p(r)')

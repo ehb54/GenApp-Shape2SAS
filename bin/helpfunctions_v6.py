@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from fast_histogram import histogram1d #histogram1d from fast_histogram is faster than np.histogram (https://pypi.org/project/fast-histogram/) 
 
 def sinc(x):
     """
@@ -463,15 +462,31 @@ def calc_Rg(r,pr):
     Rg = np.sqrt(abs(sum_pr_r2/sum_pr)/2)
     return Rg
 
-def calc_S(q,R,eta):
+def calc_S(q,volume,eta):
     """
     calculate the hard-sphere potential
     q       : momentum transfer
-    R       : estimation of the hard-sphere radius
+    volume  : volume of model used to estimate hard-sphere radius
     eta     : volume fraction
     """
 
+    ## calculate effective radius (approximation of hard-sphere radius)
+    """
+    count = 0
+    r_eff_sum = 0
+    for i in range(Number_of_models):
+        radius = (3*v/(4*np.pi))**(1./3.)
+        if model[i] != 'none':
+            count += 1
+            r_eff_sum += radius
+    r_eff = r_eff_sum/count
+    """
+    v = np.array(volume)
+    radius = (3*v/(4*np.pi))**(1./3.)
+    r_eff = np.mean(radius)
+    
     if eta > 0.0:
+        S = calc_S(q,r_eff,eta)
         A = 2*R*q 
         G = calc_G(A,eta)
         S = 1/(1 + 24*eta*G/A)
@@ -499,7 +514,7 @@ def calc_G(A,eta):
     G = a*fa/A**2 + b*fb/A**3 + c*fc/A**5
     return G
 
-def calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r):
+def calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,volume,eta,sigma_r):
     
     """
     calculates intensity using histogram, h(r) - like p(r) but with self-terms
@@ -507,7 +522,6 @@ def calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r):
 
     ## make h(r): histogram of all distances weighted with contrasts
     r,hr,Dmax,Dmax_poly = generate_hr(dist,polydispersity,Nbins,contrast)
-    Rg = calc_Rg(r,hr) 
     
     ## generate q
     M = 10*Nq
@@ -527,29 +541,25 @@ def calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r):
         I_poly = 0.0
         factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
         for factor_d in factor_range:
-            # histogram1d is faster than np.histogram (used in generate_hr()), but does not provide r. r is not needed here.
             dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,Dmax_poly))
             res = (1.0-factor_d)/polydispersity
-            w = np.exp(-res**2/2.0) # weight: normal distribution
-            vol = factor_d**3 # weight: relative volume
+            w = np.exp(-res**2/2.0) # give weight according to normal distribution
+            #vol = factor_d**3 # relative volume
+            #hr_poly += dhr*(w*vol)**2
             dI = 0.0
             for i in range(Nbins):
                 qr = q*r[i]
                 dI += dhr[i]*sinc(qr)
             dI /= np.amax(dI)
-            I_poly += dI*w*vol**2
+            I_poly += w*dI
+            #message.udpmessage({"_textarea":"."})
         I_poly /= np.amax(I_poly)
         del dhr
     else:
         I_poly = I
 
-    ## estimate hard-sphere radius by non-contrast weighted Rg (assume spherical shape)
-    hist_no_contrast = histogram1d(dist,bins=Nbins,range=(0,Dmax_poly))
-    Rg_no_contrast = calc_Rg(r,hist_no_contrast)
-    R_HS = np.sqrt(5./3.*Rg_no_contrast)
-
     ## calculate (hard-sphere) structure factor 
-    S = calc_S(q,R_HS,eta)
+    S = calc_S(q,volume,eta)
     
     ## interface roughness (Skar-Gislinge et al. DOI: 10.1039/c0cp01074j)
     if sigma_r > 0.0:
@@ -563,7 +573,7 @@ def calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r):
         for i in range(M):
             f.write('%f %f %f %f\n' % (q[i],I[i],I_poly[i],S[i]))
     
-    return Dmax,Dmax_poly,I_poly,S,I,q,r,Rg_no_contrast
+    return Dmax,Dmax_poly,I_poly,S,I,q,r
 
 def simulate_data(polydispersity,I_poly,S,I,noise,q):
 
@@ -594,60 +604,6 @@ def simulate_data(polydispersity,I_poly,S,I,noise,q):
     
     return qsim,Isim,sigma
 
-def calc_pr(dist,Nbins,contrast,Dmax_poly,polydispersity,r):
-    """
-    calculate p(r)
-    p(r) is the contrast-weighted histogram of distances, without the self-terms (dist = 0)
-    due to lack of self-terms it is not used to calc scattering (fast Debye by histogram), but used for structural interpretation
-    
-    input: 
-    dist      : all pairwise distances
-    contrast  : all pair-wise contrast products
-    Dmax_poly : Dmax for polydisperse ensemble
-    polydispersity: boolian, True or False
-    r         : pair distances of bins
-
-    output:
-    pr        : pair distance distribution function (PDDF) for monodisperse shape
-    pr_poly   : PDDF for polydisperse ensemble
-    """
-    ## remove non-zero elements (tr for truncate)
-    idx_nonzero = np.where(dist>0.0)
-    dist_tr = dist[idx_nonzero]
-    del dist # less memory consumption 
-
-    contrast_tr = contrast[idx_nonzero]
-    del contrast # less memory consumption 
-    
-    # calculate monodisperse p(r)
-    pr = histogram1d(dist_tr,bins=Nbins,weights=contrast_tr,range=(0,Dmax_poly))
-    
-    ## calculate polydisperse p(r)
-    N_poly_integral = 9
-    if polydispersity > 0.0:
-        pr_poly = 0.0
-        factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
-        for factor_d in factor_range:
-            dpr = histogram1d(dist_tr*factor_d,bins=Nbins,weights=contrast_tr,range=(0,Dmax_poly))
-            res = (1.0-factor_d)/polydispersity
-            w = np.exp(-res**2/2.0) # weight: normal distribution
-            vol = factor_d**3 # weight: relative volume, because larger particles scatter more
-            pr_poly += dpr*w*vol**2
-    else:
-        pr_poly = pr
-    
-    ## normalize so pr_max = 1 
-    pr /= np.amax(pr) 
-    pr_poly /= np.amax(pr_poly)
-    
-    ## save p(r) to textfile
-    with open('pr.d','w') as f:
-        f.write('#  r p(r) p_polydisperse(r)\n')
-        for i in range(Nbins):
-            f.write('%f %f %f\n' % (r[i],pr[i],pr_poly[i]))
-    
-    return pr,pr_poly
-
 def plot_2D(x_new,y_new,z_new,p_new):
     """
     plot 2D-projections of generated points (shapes) using matplotlib:
@@ -666,16 +622,13 @@ def plot_2D(x_new,y_new,z_new,p_new):
     max_l = np.amax([max_x,max_y,max_z])
     lim = [-max_l,max_l]
 
-    ## find indices of positive, zero and negatative contrast
+    ## figure
+    #indices of negatative contrast
     idx_neg = np.where(p_new<0.0)
     idx_pos = np.where(p_new>0.0)
     idx_nul = np.where(p_new==0.0)
-    
-    ## figure settings
     plt.figure(figsize=(15,10))
     markersize = 3
-
-    ## plot, perspective 1
     p1 = plt.subplot(2,3,1)
     p1.plot(x_new[idx_pos],z_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color='red')
     p1.plot(x_new[idx_neg],z_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
@@ -686,7 +639,6 @@ def plot_2D(x_new,y_new,z_new,p_new):
     p1.set_ylabel('z')
     p1.set_title('pointmodel, (x,z), "front"')
 
-    ## plot, perspective 2
     p2 = plt.subplot(2,3,2)
     p2.plot(y_new[idx_pos],z_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color='red')
     p2.plot(y_new[idx_neg],z_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
@@ -697,7 +649,6 @@ def plot_2D(x_new,y_new,z_new,p_new):
     p2.set_ylabel('z')
     p2.set_title('pointmodel, (y,z), "side"')
 
-    ## plot, perspective 3
     p3 = plt.subplot(2,3,3)
     p3.plot(x_new[idx_pos],y_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color='red')
     p3.plot(x_new[idx_neg],y_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
@@ -718,6 +669,7 @@ def plot_results(r,pr,pr_poly,q,I,I_poly,S,qsim,Isim,sigma,polydispersity,eta):
 
     ## plot p(r)
     p4 = plt.subplot(2,3,4)
+    #p4.plot(r,hr,color='green')
     p4.plot(r,pr,color='red',label='p(r), monodisperse')
     p4.set_xlabel('r [Angstrom]')
     p4.set_ylabel('p(r)')

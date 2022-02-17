@@ -102,14 +102,25 @@ if __name__=='__main__':
         except:
             z.append(0.0)
 
-    ################### GENERATE POINTS IN USER-DEFINED SHAPES #####################################
 
-    ## timing
+    ################### GENERATE POINTS #####################################
+
     start_points = time.time()
     message.udpmessage({"_textarea":"\n# Generating and plotting points\n" })
 
     ## generate points
     N,rho,N_exclude,volume,x_new,y_new,z_new,p_new = gen_all_points(Number_of_models,x,y,z,model,a,b,c,p,exclude_overlap)
+
+    ## print output
+    for i in range(Number_of_models):
+        if model[i] != 'none':
+            srho = rho[i]*p[i]
+            message.udpmessage({"_textarea":"    generating %d points for model %d: %s\n" % (N[i],i+1,model[i]) })
+            message.udpmessage({"_textarea":"       point density      : %1.2e (points per volume)\n" % rho[i]}) 
+            message.udpmessage({"_textarea":"       scattering density : %1.2e (density times scattering length)\n" % srho})
+            if exclude_overlap:
+                message.udpmessage({"_textarea":"       excluded points    : %d (overlap region)\n" % N_exclude[i]})
+    message.udpmessage({"_textarea":"    total number of points: %d\n" % np.sum(N)})
 
     ## vizualization part 1: plot 2D projections
     plot_2D(x_new,y_new,z_new,p_new)
@@ -119,30 +130,15 @@ if __name__=='__main__':
 
     ## end time for point generation
     time_points = time.time()-start_points
+    message.udpmessage({"_textarea":"    time points: %1.2f\n" % time_points})
 
-    ## output
-    N_remain = []
-    for i in range(Number_of_models):
-        if model[i] != 'none':
-            srho = rho[i]*p[i]
-            N_remain.append(N[i] - N_exclude[i])
-            message.udpmessage({"_textarea":"    generating %d points for model %d: %s\n" % (N[i],i+1,model[i]) })
-            message.udpmessage({"_textarea":"       point density      : %1.2e (points per volume)\n" % rho[i]})
-            message.udpmessage({"_textarea":"       scattering density : %1.2e (density times scattering length)\n" % srho})
-            if exclude_overlap:
-                message.udpmessage({"_textarea":"       excluded points    : %d (overlap region)\n" % N_exclude[i]})
-                message.udpmessage({"_textarea":"       remaining points   : %d (non-overlapping region)\n" % N_remain[i]})
-    N_total = np.sum(N_remain)
-    message.udpmessage({"_textarea":"    total number of points: %d\n" % np.sum(N_total)})
-    message.udpmessage({"_textarea":"    time, points: %1.2f\n" % time_points})
-
-    ################### CALCULATE PAIR-WISE DISTANCES FOR ALL POINTS  #####################################
+    ################### CALCULATE DISTANCES #####################################
     
-    ## timing
+    ## calculate all distances
     start_dist = time.time()
     message.udpmessage({"_textarea":"\n# Calculating distances...\n"})
 
-    ## calculate all pair-wise distances in COMPOSED object
+    ## calculate all pair-wise distances in generated object
     dist = calc_all_dist(x_new,y_new,z_new)
 
     ## calculate all pair-wise contrasts
@@ -156,27 +152,61 @@ if __name__=='__main__':
 
     ################### CALCULATE I(q) using histogram  #####################################
     
-    ## timing
     start_pr = time.time()
-    message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram) and I(q) (intensity)...\n"})
+    message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)..."})
     
     ## calculate intensity 
-    Dmax,Dmax_poly,I_poly,S,I,q,r,Rg_no_contrast = calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r)
-    message.udpmessage({"_textarea":"\n# Rg_no_contrast = %f \n" % Rg_no_contrast})
+    Dmax,Dmax_poly,I_poly,S,I,q,r = calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,volume,eta,sigma_r)
 
     ## simulate data
     qsim,Isim,sigma = simulate_data(polydispersity,I_poly,S,I,noise,q)
 
     ################### CALCULATE p(r) #####################################
     
-    # calculate p(r) 
+    
     pr,pr_poly = calc_pr(dist,Nbins,contrast,Dmax_poly,polydispersity,r)
     
+    """
+    ## remove non-zero elements (tr for truncate)
+    idx_nonzero = np.where(dist>0.0)
+    dist_tr = dist[idx_nonzero]
+    del dist
+    contrast_tr = contrast[idx_nonzero]
+    del contrast
+    pr = histogram1d(dist_tr,bins=Nbins,weights=contrast_tr,range=(0,Dmax_poly))
+    
+    N_poly_integral = 9
+    if polydispersity > 0.0:
+        pr_poly = 0.0
+        factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
+        for factor_d in factor_range:
+            dpr = histogram1d(dist_tr*factor_d,bins=Nbins,weights=contrast_tr,range=(0,Dmax_poly))
+            res = (1.0-factor_d)/polydispersity
+            w = np.exp(-res**2/2.0) # give weight according to normal distribution
+            vol = factor_d**3 # give weight according to (relative) volume square
+            pr_poly += dpr*w*vol
+    else:
+        pr_poly = pr
+    
+    message.udpmessage({"_textarea":".\n"})
+    del dist_tr,contrast_tr
+   
+    ## normalize so pr_max = 1 
+    pr /= np.amax(pr) 
+    pr_poly /= np.amax(pr_poly)
+    
+    ## save p(r) to textfile
+    with open('pr.d','w') as f:
+        f.write('#  r p(r) p_polydisperse(r)\n')
+        for i in range(Nbins):
+            f.write('%f %f %f\n' % (r[i],pr[i],pr_poly[i]))
+    """
+
     # calculate Rg
     Rg = calc_Rg(r,pr)
     Rg_poly = calc_Rg(r,pr_poly)
 
-    ## output
+    ## send output messages
     time_pr = time.time() - start_pr
     message.udpmessage({"_textarea":"    Dmax              = %1.2f\n" % Dmax})
     message.udpmessage({"_textarea":"    Rg                = %1.2f\n" % Rg})
@@ -185,9 +215,7 @@ if __name__=='__main__':
         message.udpmessage({"_textarea":"    Rg polydisperse   = %1.2f\n" % Rg_poly})
     message.udpmessage({"_textarea":"    time p(r)         : %1.2f sec\n" % time_pr})
 
-    ################### GENERATE OUTPUT TO GUI  #####################################
-    
-    ## start time for output generation
+    ## start time for output
     start_output = time.time()
 
     ## generate plots of p(r) and I(q) 
@@ -197,7 +225,14 @@ if __name__=='__main__':
     ## compress output files to zip file
     os.system('zip results.zip pr.d Iq.d Isim.d model.pdb plot.png')
 
-    ## structure output to GUI
+    time_output = time.time()-start_output
+    message.udpmessage({"_textarea":"    time output: %1.2f sec\n" % time_output}) 
+
+    ## total time
+    time_total = time.time()-start_total
+    message.udpmessage({"_textarea":"\n# Finished succesfully.\n    time total: %1.2f sec\n" % time_total}) 
+
+    ## generate output to GUI
     output = {} # create an empty python dictionary
     output["pr"] = "%s/pr.d" % folder
     output["Iq"] = "%s/Iq.d" % folder
@@ -214,17 +249,16 @@ if __name__=='__main__':
         output["Dmax_poly"] = "N/A"
         output["Rg_poly"] = "N/A"
 
-    ## timing for output generation
-    time_output = time.time()-start_output
-    message.udpmessage({"_textarea":"    time output: %1.2f sec\n" % time_output}) 
-    
     #output['_textarea'] = "JSON output from executable:\n" + json.dumps( output, indent=4 ) + "\n\n";
     #output['_textarea'] += "JSON input to executable:\n" + json.dumps( json_variables, indent=4 ) + "\n";
-    
-    ## total time
-    time_total = time.time()-start_total
-    message.udpmessage({"_textarea":"\n# Finished succesfully.\n    time total: %1.2f sec\n" % time_total})
 
     ## send output to GUI
     print( json.dumps(output) ) # convert dictionary to json and output
 
+
+    ## debugging
+#   for i in range(len(pr_poly)):
+#        message.udpmessage({"_textarea":"pr_poly[%d]: %1.2f\n" % (i,pr_poly[i])})
+
+
+#   message.udpmessage({"_textarea":"i,x[i],y[i],z[i],model[i],a[i],b[i],c[i],p[i],Npoints = %d,%f,%f,%f,%s,%f,%f,%f,%f,%d\n" % (i,x[i],y[i],z[i],model[i],a[i],b[i],c[i],p[i],Npoints) }) # use for debugging

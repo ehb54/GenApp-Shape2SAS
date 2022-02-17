@@ -1,0 +1,268 @@
+{
+#    "moduleid" : "ift"
+    "moduleid" : "mcsim"
+    ,"label"    : "McSim"
+#    ,"executable"   : "ift"
+    ,"executable"   : "mcsim.py"
+    ,"submitpolicy" : "all"
+#    ,"uniquedir" : "true"
+#    ,"center" : "true"
+    ,"centeroutput" : "true"
+# dependencies:
+# apt-get install libgfortran3 libpng-dev libreadline-dev
+# install and compile gnuplot 4.2.6 with gif support    
+    ,"fields"   : [
+        {
+            "role"       : "input"
+            ,"id"        : "label_0"
+            ,"type"      : "label"
+            ,"colspan"   : 3
+            ,"default"   : "header3"
+            ,"label"     : "McSim"	   
+#            ,"label"     : "McSim [<a target=_blank href=https://scripts.iucr.org/cgi-bin/paper?pe0063>1,</a><a target=_blank href=https://onlinelibrary.wiley.com/iucr/doi/10.1107/S0021889812014318>2,</a><a target=_blank href=http://journals.iucr.org/j/issues/2014/04/00/he5656>3,</a><a target=_blank href=https://scripts.iucr.org/cgi-bin/paper?gk0508>4,</a><a target=_blank href=https://scripts.iucr.org/cgi-bin/paper?wf5022>5,</a><a target=_blank href=https://github.com/Niels-Bohr-Institute-XNS-StructBiophys/BayesApp>Source code</a>]"
+            ,"prehline"  : "true"
+            ,"posthline" : "true"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "qmin"
+            ,"label"      : "q min"
+            ,"type"       : "float"
+            ,"step"       : 0.001
+	    ,"default"    : 0.01
+            ,"help"       : "q min in inverse Angstroms."
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "qmax"
+            ,"label"      : "q max "
+            ,"type"       : "float"
+            ,"step"       : 0.001
+	    ,"default"    : 1.0
+            ,"help"       : "q max in inverse Angstroms."
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "polydispersity"
+            ,"label"      : "relative polydispersity "
+            ,"type"       : "float"
+            ,"step"       : 0.01
+            ,"default"    : 0.0
+	    ,"min"        : 0.0
+	    ,"max"        : 0.2
+            ,"help"       : "Relative polydispersity. Min: 0.0 (monodisperse), max: 0.2."
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "prpoints"
+            ,"label"      : "Number of points in p(r)"
+            ,"type"       : "integer"
+            ,"min"        : 10
+            ,"default"    : 100
+            ,"max"        : 200
+            ,"help"       : "<p>Optionally enter the number of points in the estimated function p(r).</p><p>Default: 100, Minimum 10, Maximum 200</p>"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "label_model"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "Model"
+            ,"help"       : "<p>Models and parameters:</p><p>Square; a: width, b: depth, c: height</p><p>(Hollow) Sphere; a: outer radius, b: inner radius (b=0 for solid sphere), c: no function</p><p> Ellipse; a, b, c: semiaxes</p><p> Cylinder; a, b: semiaxes, c: length</p><p>None; No points generated</p>"
+            ,"norow"      : "true"
+	    ,"readonly"   : "true"
+	    ,"size"       : 22
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_a"
+            ,"label"      : " "
+            ,"type"       : "text"
+	    ,"default"    : "a"
+	    ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+	    ,"help"       : "<p>Cuboid: width</p><p>(Hollow) Sphere: outer radius</p><p>Ellipse: semiaxis</p><p>Cylinder: semiaxis</p><p>None: no effect</p>"
+        }
+        ,{
+            "role"       : "input"
+            ,"id"         : "label_b"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "b"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "<p>Cuboid: depth</p><p>(Hollow) Sphere: inner radius. b=0 for solid sphere</p><p>Ellipse: semiaxis</p><p>Cylinder: semiaxis</p><p>None: no effect</p>"
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_c"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "c"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "<p>Cuboid: height</p><p>(Hollow) Sphere: no effect</p><p>Ellipse: semiaxis</p><p>Cylinder: length</p><p>None: no effect</p>"
+	}
+        ,{
+            "role"       : "input"
+            ,"id"         : "label_p"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "scattering length"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "Scattering length per point in object"
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_x"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "x_com"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "center of mass x position of object" 
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_y"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "y_com"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "center of mass y position of object"
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "label_z"
+            ,"label"      : " "
+            ,"type"       : "text"
+            ,"default"    : "z_com"
+            ,"norow"      : "true"
+            ,"readonly"   : "true"
+            ,"size"       : 20
+            ,"help"       : "center of mass z position of object"
+        }
+#################################################################################################################       
+        ,{"role": "input","id": "model1","label": " ","type": "listbox","values": "Cuboid~square~Sphere (Solid or hollow)~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~None (no points)~none","norow": "true","size": 30,"default": "sphere"}
+        ,{"role": "input","id": "a1","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "b1","label": " ","type": "float","min": "0","default": 5,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "c1","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+	,{"role": "input","id": "p1","label": " ","type": "float","default": 1,"norow": "true","required"   : "true"}
+	,{"role": "input","id": "x1","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+	,{"role": "input","id": "y1","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+	,{"role": "input","id": "z1","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+#################################################################################################################       
+        ,{"role": "input","id": "model2","label": " ","type": "listbox","values": "Cuboid~square~Sphere (Solid or hollow)~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~None (no points)~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a2","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "b2","label": " ","type": "float","min": "0","default": 5,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "c2","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "p2","label": " ","type": "float","default": 1,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "x2","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "y2","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "z2","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+#################################################################################################################
+        ,{"role": "input","id": "model3","label": " ","type": "listbox","values": "Cuboid~square~Sphere (Solid or hollow)~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~None (no points)~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a3","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "b3","label": " ","type": "float","min": "0","default": 5,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "c3","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "p3","label": " ","type": "float","default": 1,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "x3","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "y3","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "z3","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+#################################################################################################################
+        ,{"role": "input","id": "model4","label": " ","type": "listbox","values": "Cuboid~square~Sphere (Solid or hollow)~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~None (no points)~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a4","label": " ","type": "float","min": "0","default": 10,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "b4","label": " ","type": "float","min": "0","default": 5,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "c4","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "p4","label": " ","type": "float","default": 1,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "x4","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "y4","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "z4","label": " ","type": "float","default": 0.0,"norow": "true","required"   : "true"}
+#################################################################################################################
+        ,{
+            "role"       : "output"
+            ,"id"         : "hroutput"
+            ,"label"      : "<hr> Output files <hr>"
+            ,"type"       : "label"
+            ,"colspan"    : 2
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "pr"
+            ,"label"      : "p(r)"
+            ,"type"       : "file"
+            ,"help"       : "The calculated p(r)"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "Iq"
+            ,"label"      : "Intensity"
+            ,"type"       : "file"
+            ,"help"       : "The calculated intensity, I(q)"
+        }
+	,{
+            "role"       : "output"
+            ,"id"         : "pdb"
+            ,"label"      : "PDB file with model"
+            ,"type"       : "file"
+            ,"help"       : "PDB file of model, for visualization, e.g. in PyMOL. Alle points represented as dummy Carbon beads."
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "zip"
+            ,"label"      : "Results zipped"
+            ,"type"       : "file"
+            ,"help"       : "Results packaged in a zip file"
+        }
+	,{
+            "role"       : "output"
+            ,"id"         : "label_parameters"
+            ,"label"      : "<hr> Structural parameters <hr>"
+            ,"type"       : "label"
+            ,"colspan"    : 2
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "Dmax"
+            ,"label"      : "Dmax, monodisperse"
+            ,"type"       : "text"
+	    ,"help"       : "Maximum distance in monodisperse particle"
+        }  
+        ,{
+            "role"       : "output"
+            ,"id"         : "Rg"
+            ,"label"      : "Rg, monodisperse"
+            ,"type"       : "text"
+            ,"help"       : "Radius of gyration of monodisperse particle"
+        }	
+       	,{
+            "role"       : "output"
+            ,"id"         : "Dmax_poly"
+            ,"label"      : "Dmax, polydisperse"
+            ,"type"       : "text"
+            ,"help"       : "Maximum distance in polydisperse sample"
+        }
+	,{
+            "role"       : "output"
+            ,"id"         : "Rg_poly"
+            ,"label"      : "Rg, polydisperse"
+            ,"type"       : "text"
+            ,"help"       : "Radius of gyration of polydisperse sample"
+        }
+        ,{
+            "role"       : "output"
+            ,"id"         : "fig"
+            ,"label"      : ""
+            ,"type"       : "image"
+            ,"width"      : "80%"
+        }
+    ]
+}
