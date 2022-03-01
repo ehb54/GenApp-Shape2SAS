@@ -106,6 +106,7 @@
             ,"id"         : "exclude_overlap"
             ,"label"      : "Exclude overlap regions"
             ,"type"       : "checkbox"
+	    ,"checked"    : "true"
             ,"help"       : "<p>Exclude overlap regions.</p><p>If there is overlap with models higher up in the list, the points in the overlap region will be omitted.</p>"
         }
         ,{

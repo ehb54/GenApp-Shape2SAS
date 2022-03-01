@@ -559,9 +559,9 @@ def calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r):
 
     ## save all intensities to textfile
     with open('Iq.d','w') as f:
-        f.write('# q I(q) I(q) polydisperse S(q)\n')
+        f.write('# %-17s %-17s %-17s %-17s\n' % ('q','I(q)','I(q) polydisperse','S(q)'))
         for i in range(M):
-            f.write('%f %f %f %f\n' % (q[i],I[i],I_poly[i],S[i]))
+            f.write('  %-17.5e %-17.5e %-17.5e %-17.5e\n' % (q[i],I[i],I_poly[i],S[i]))
     
     return Dmax,Dmax_poly,I_poly,S,I,q,r,Rg_no_contrast
 
@@ -588,9 +588,11 @@ def simulate_data(polydispersity,I_poly,S,I,noise,q):
 
     ## save to file
     with open('Isim.d','w') as f:
-        f.write('# Simulated data\n# sigma generated using Sedlak et al, k=10000, c=0.85, https://doi.org/10.1107/S1600576717003077, and rebinned with 10 per bin)\n# q I sigma\n')
+        f.write('# Simulated data\n')
+        f.write('# sigma generated using Sedlak et al, k=10000, c=0.85, https://doi.org/10.1107/S1600576717003077, and rebinned with 10 per bin)\n')
+        f.write('# %-12s %-12s %-12s\n' % ('q','I','sigma'))
         for i in range(len(Isim)):
-            f.write('%f %f %f\n' % (qsim[i],Isim[i],sigma[i]))
+            f.write('  %-12.5e %-12.5e %-12.5e\n' % (qsim[i],Isim[i],sigma[i]))
     
     return qsim,Isim,sigma
 
@@ -642,9 +644,9 @@ def calc_pr(dist,Nbins,contrast,Dmax_poly,polydispersity,r):
     
     ## save p(r) to textfile
     with open('pr.d','w') as f:
-        f.write('#  r p(r) p_polydisperse(r)\n')
+        f.write('# %-17s %-17s %-17s\n' % ('r','p(r)','p_polydisperse(r)'))
         for i in range(Nbins):
-            f.write('%f %f %f\n' % (r[i],pr[i],pr_poly[i]))
+            f.write('  %-17.5e %-17.5e %-17.5e\n' % (r[i],pr[i],pr_poly[i]))
     
     return pr,pr_poly
 
