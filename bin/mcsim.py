@@ -227,3 +227,4 @@ if __name__=='__main__':
     ## send output to GUI
     print( json.dumps(output) ) # convert dictionary to json and output
 
+    
