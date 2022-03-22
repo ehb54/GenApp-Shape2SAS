@@ -4,11 +4,11 @@ calulating the pair distance distribution function, p(r), and the scattering int
 
 the program is strongly inspired by an old version with the same name (see citation below), but completely rewritten by Andreas Haahr Larsen    
 
-## how to run the program
+## How to run the program
 
 McSim is run via the web GUI. 
 
-## files
+## Files
 
 ### modules/mcsim.json
 GUI
@@ -19,7 +19,7 @@ takes input from GUI, send to functions and return output to GUI.
 
 ### bin/helpfunctions.py
 the engine.   
-contains a lot of functions that, e.g.:  
+contains a functions that, e.g.:  
 - generates points from user input   
 - calculates p(r)   
 - calculates I(q)   
@@ -31,7 +31,7 @@ all other files are:
 - genapp-specific (related to the GUI) and should not be altered    
 - old versions of the above    
 
-### citation
+### Cite
 please cite:     
 Steen Hansen (1990)    
 Journal of Applied Crystallography 23, 344-346     
@@ -45,6 +45,11 @@ and please acknowledge:
 Andreas Haahr Larsen who wrote the program and GUI    
 Emre Brookes, who maintains GenApp and supports development of new programs and features   
 
-## contact
-andreas.larsen@sund.ku.dk    
+## Contact
+Andreas Haahr Larsen    
+andreas.larsen(at)sund.ku.dk 
 
+## Planned changes/ideas    
+make papar, presenting the program in and educational context   
+add more strucutre factors (other than hard-sphere)   
+add option for comparison with (and fit to?) experimental data   
