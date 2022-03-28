@@ -435,21 +435,25 @@ def calc_all_contrasts(p_new):
     
     return contrast
 
-def generate_histogram(dist,contrast,r_max,Nbins):
+def generate_histogram(dist,contrast,Dmax,Nbins):
     """
     make histogram of point pairs, h(r), binned after pair-distances, r
     used for calculating scattering (fast Debye)
     dist     : all pairwise distances
     Nbins    : number of bins in h(r)
     contrast : contrast of points
-    r_max    : max distance to include in histogram
     """
-
-    histo,bin_edges = np.histogram(dist,bins=Nbins,weights=contrast,range=(0,r_max)) 
+    histo,bin_edges = np.histogram(dist,bins=Nbins,weights=contrast,range=(0,Dmax)) 
     dr = bin_edges[2]-bin_edges[1]
     r = bin_edges[0:-1]+dr/2
     
     return r,histo
+
+def calc_Dmax(dist,polydispersity):
+    Dmax = np.amax(dist)
+    Dmax *= (1+3*polydispersity)
+
+    return Dmax
 
 def calc_Rg(r,pr):
     """ 
@@ -460,7 +464,7 @@ def calc_Rg(r,pr):
     Rg = np.sqrt(abs(sum_pr_r2/sum_pr)/2)
     return Rg
 
-def calc_S_HS(q,R,eta):
+def calc_S(q,R,eta):
     """
     calculate the hard-sphere potential
     q       : momentum transfer
@@ -496,40 +500,45 @@ def calc_G(A,eta):
     G = a*fa/A**2 + b*fb/A**3 + c*fc/A**5
     return G
 
-def generate_q(qmin,qmax,Nq):
-    """
-    generate q-vector
-    """
-
-    q = np.linspace(qmin,qmax,Nq)
-
-    return q
-
-def calc_S(q,R_HS,eta,Model):
-    """
-    calculates a structure factor S(q) given some input parameters
-    """
-
-    ## calculate (hard-sphere) structure factor 
-    S = calc_S_HS(q,R_HS,eta)
-
-    ## save structure factor to file
-    with open('Sq%s.d' % Model,'w') as f:
-        f.write('# Structure factor, S(q), used in: I(q) = P(q)*S(q)\n')
-        f.write('# Default: S(q) = 1.0)\n')
-        f.write('# %-17s %-17s\n' % ('q','S(q)'))
-        for (q_i,S_i) in zip(q,S):
-            f.write('  %-17.5e%-17.5e\n' % (q_i,S_i))
-
-    return S
-
-def calc_Iq(q,r,pr,S,sigma_r,Model):
+    
+#def calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r,Model):
+#def calc_Iq(r,pr,qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r,Model):
+def calc_Iq(r,pr,qmin,qmax,Nq,dist,Dmax,eta,sigma_r,Model):
     """
     calculates intensity using histogram
     """
+    ## make h(r): histogram of all distances weighted with contrasts
+    #Dmax = calc_Dmax(dist,polydispersity)
+    #r,hr,Dmax = generate_histogram(dist,contrast,Dmax,Nbins)
     
-    ## calculate I(q) from p(r)
+    ## generate q
+    M = 100*Nq
+    q = np.linspace(qmin,qmax,M)
+
     I = 0.0
+    """
+    if polydispersity > 0.0:
+        N_poly_integral = 9 # number of steps in polydispersity integral
+        factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
+        for factor_d in factor_range:
+            # histogram1d is faster than np.histogram (used in generate_histogram()), but does not provide r. r is not needed here.
+            dpr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,Dmax))
+            res = (1.0-factor_d)/polydispersity
+            w = np.exp(-res**2/2.0) # weight: normal distribution
+            vol = factor_d**3 # weight: relative volume
+            dI = 0.0
+            for i in range(Nbins):
+                qr = q*r[i]
+                dI += dpr[i]*sinc(qr)
+            dI /= np.amax(dI)
+            I += dI*w*vol**2
+        del dpr
+    else:
+        for i in range(Nbins):
+            qr = q*r[i]
+            I += pr[i]*sinc(qr)
+    """
+
     for (r_i,pr_i) in zip(r,pr):
         qr = q*r_i
         I += pr_i*sinc(qr)
@@ -537,9 +546,15 @@ def calc_Iq(q,r,pr,S,sigma_r,Model):
     ## normalization
     I /= np.amax(I)
 
-    ## structure factor
+    ## estimate hard-sphere radius by non-contrast weighted Rg (assume spherical shape)
+    hist_no_contrast = histogram1d(dist,bins=len(r),range=(0,Dmax))
+    Rg_no_contrast = calc_Rg(r,hist_no_contrast)
+    R_HS = np.sqrt(5./3.*Rg_no_contrast)
+
+    ## calculate (hard-sphere) structure factor 
+    S = calc_S(q,R_HS,eta)
     I *= S
-     
+    
     ## interface roughness (Skar-Gislinge et al. DOI: 10.1039/c0cp01074j)
     if sigma_r > 0.0:
         roughness = np.exp(-(q*sigma_r)**2/2)
@@ -548,19 +563,33 @@ def calc_Iq(q,r,pr,S,sigma_r,Model):
     ## save intensity to file
     with open('Iq%s.d' % Model,'w') as f:
         f.write('# %-17s %-17s\n' % ('q','I(q)'))
-        for (q_i,I_i) in zip(q,I):
-            f.write('  %-17.5e %-17.5e\n' % (q_i,I_i))
+        for i in range(M):
+            f.write('  %-17.5e %-17.5e\n' % (q[i],I[i]))
     
-    return I
+    ## save structure factor to file
+    with open('Sq%s.d' % Model,'w') as f:
+        f.write('# Structure factor, S(q), used in: I(q) = P(q)*S(q)\n')
+        f.write('# Default: S(q) = 1.0)\n')
+        f.write('# %-17s %-17s\n' % ('q','S(q)'))
+        for i in range(M):
+            f.write('  %-17.5e%-17.5e\n' % (q[i],S[i]))    
+
+    return q,I
 
 def simulate_data(q,I,noise,Model):
 
     ## simulate exp error
     #input, sedlak errors (https://doi.org/10.1107/S1600576717003077)
-    k = 5000000
-    c = 0.05
+    k = 100000
+    c = 0.55
     mu = I
     sigma = noise*np.sqrt((mu+c)/(k*q))
+
+    ##pseudo-rebin
+    Nrebin = 100 # keep every Nth point
+    mu = mu[::Nrebin]
+    qsim = q[::Nrebin]
+    sigma = sigma[::Nrebin]/np.sqrt(Nrebin)
 
     ## simulate data using errors
     Isim = np.random.normal(mu,sigma)
@@ -571,9 +600,9 @@ def simulate_data(q,I,noise,Model):
         f.write('# sigma generated using Sedlak et al, k=100000, c=0.55, https://doi.org/10.1107/S1600576717003077, and rebinned with 10 per bin)\n')
         f.write('# %-12s %-12s %-12s\n' % ('q','I','sigma'))
         for i in range(len(Isim)):
-            f.write('  %-12.5e %-12.5e %-12.5e\n' % (q[i],Isim[i],sigma[i]))
+            f.write('  %-12.5e %-12.5e %-12.5e\n' % (qsim[i],Isim[i],sigma[i]))
     
-    return Isim,sigma
+    return qsim,Isim,sigma
 
 def calc_hr(dist,Nbins,contrast,polydispersity,Model):
     """
@@ -588,28 +617,24 @@ def calc_hr(dist,Nbins,contrast,polydispersity,Model):
     output:
     hr        : pair distance distribution function 
     """
+    
+    ## calculate p(r)
+    Dmax = calc_Dmax(dist,polydispersity)
+    r,hr = generate_histogram(dist,contrast,Dmax,Nbins)
 
-    ## make r range in h(r) histogram slightly larger than Dmax
-    ratio_rmax_dmax = 1.05
-
-    ## calc h(r) with/without polydispersity
+    ## calculate p(r)
     if polydispersity > 0.0:
-        Dmax = np.amax(dist) * (1+3*polydispersity)
-        r_max = Dmax*ratio_rmax_dmax
         N_poly_integral = 9
-        r,hr = generate_histogram(dist,contrast,r_max,Nbins)
         hr = 0.0
         factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
         for factor_d in factor_range:
-            dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,r_max))
+            dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,Dmax*1.5))
             res = (1.0-factor_d)/polydispersity
             w = np.exp(-res**2/2.0) # weight: normal distribution
             vol = factor_d**3 # weight: relative volume, because larger particles scatter more
             hr += dhr*w*vol**2
     else:
-        Dmax = np.amax(dist)
-        r_max = Dmax*ratio_rmax_dmax
-        r,hr = generate_histogram(dist,contrast,r_max,Nbins)
+        hr = histogram1d(dist,bins=Nbins,weights=contrast,range=(0,Dmax*1.5))
     
     ## normalize so hr_max = 1 
     hr /= np.amax(hr) 
@@ -732,12 +757,12 @@ def plot_2D(x_new,y_new,z_new,p_new,max_dimension,Model):
     plt.close()
 
 
-def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
+def plot_results(r,pr,q,I,qsim,Isim,sigma):
     """
     plot results using matplotlib:
     - p(r) 
-    - calculated scattering
-    - simulated noisy data 
+    - calculated formfactor, P(r) on log-log and lin-lin scale
+    - simulated noisy data on log-log and lin-lin scale
     """
    
     ## plot settings
@@ -750,28 +775,23 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     ax[0].set_ylabel('p(r)')
     ax[0].set_title('Pair distribution funciton, p(r)')
 
-    ## plot scattering
-    if xscale_log:
-        ax[1].set_xscale('log')
+    ## plot scattering, log-log
+    ax[1].set_xscale('log')
     ax[1].set_yscale('log')
     ax[1].set_xlabel('q [1/Angstrom]')
     ax[1].set_ylabel('I(q)')
-    ax[1].set_title('Calculated scattering, without noise')
-    if S[0] < 1.0:
-        ax[1].plot(q,S,color='black',label='S(q)')
-        ax[1].plot(q,I,color=color,label='I(q) = P(q)*S(q)')
-    else:
-       ax[1].plot(q,I,color=color,label='I(q)')
+    ax[1].set_title('Scattering, log-log scale')
+    ax[1].plot(q,I,color=color,label='P(q)')
+    ax[1].errorbar(qsim,Isim,yerr=sigma,linestyle='none',marker='.',color='lightgrey',label='I(q), simulated',zorder=0)
     ax[1].legend()
 
-    ## plot simulated data 
-    if xscale_log:
-        ax[2].set_xscale('log')
+    ## plot scattering, lin-log
     ax[2].set_yscale('log')
     ax[2].set_xlabel('q [1/Angstrom]')
     ax[2].set_ylabel('I(q)')
-    ax[2].set_title('Simulated scattering, with noise')
-    ax[2].errorbar(q,Isim,yerr=sigma,linestyle='none',marker='.',color='pink',label='I(q), simulated',zorder=0)
+    ax[2].set_title('Scattering, lin-log scale')
+    ax[2].plot(q,I,color=color,label='P(q)')
+    ax[2].errorbar(qsim,Isim,yerr=sigma,linestyle='none',marker='.',color='lightgrey',label='I(q), simulated',zorder=0)
     ax[2].legend()
 
     ## figure settings
@@ -779,7 +799,7 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     plt.savefig('plot.png')
     plt.close()
 
-def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,xscale_log,scale_Isim):
+def plot_results_combined(r1,pr1,q1,I1,qsim1,Isim1,sigma1,r2,pr2,q2,I2,qsim2,Isim2,sigma2):
     """
     plot results (combined = Model 1 and Model 2), using matplotlib:
     - p(r) 
@@ -789,23 +809,12 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
 
     fig,ax = plt.subplots(1,3,figsize=(15,5))
 
-    for (r,pr,I,Isim,sigma,S,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],['red','blue'],['pink','skyblue'],['-','--'],[1,scale_Isim],[1,2]):
+    for (r,pr,q,I,qsim,Isim,sigma,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[q1,q2],[I1,I2],[qsim1,qsim2],[Isim1,Isim2],[sigma1,sigma2],[1,2],['red','blue'],['pink','skyblue'],['-','--'],[1,100],[2,3]):
         ax[0].plot(r,pr,linestyle=line,color=col,zorder=zo,label='p(r), Model %d' % model)
-        if scale > 1: 
-            #ax[1].plot(q,I*scale,linestyle=line,color=col,zorder=zo,label='P(q), Model %d, scaled by %d' % (model,scale))
-            #ax[2].plot(q,I*scale,linestyle=line,color=col,label='P(q), Model %d, scaled by %d' % (model,scale))
-            #ax[1].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='I(q), simulated, scaled by %d' % scale,zorder=zo-2)
-            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d, scaled by %d' % (model,scale),zorder=3-zo)
-        else:
-            #ax[1].plot(q,I*scale,linestyle=line,color=col,zorder=zo,label='P(q), Model %d' % model)
-            #ax[2].plot(q,I*scale,linestyle=line,color=col,label='P(q), Model %d' % model)
-            #ax[1].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='I(q), simulated',zorder=zo-2)
-            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q)',zorder=zo)
-        if S[0] < 1.0:
-            ax[1].plot(q,S,color='black',label='S(q), Model %d' % model,zorder=0)
-            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q)=P(q)*S(q), Model %d' % model)
-        else:
-            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q), Model %d' % model)
+        ax[1].plot(q,I*scale,linestyle=line,color=col,zorder=zo,label='P(q), Model %d' % model)
+        ax[2].plot(q,I*scale,linestyle=line,color=col,label='P(q), Model %d, scaled' % model)
+        ax[1].errorbar(qsim,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='I(q), simulated',zorder=zo-2)
+        ax[2].errorbar(qsim,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='I(q), simulated',zorder=zo-2)
 
     ## plot p(r)
     ax[0].set_xlabel('r [Angstrom]')
@@ -813,21 +822,18 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
     ax[0].set_title('Pair distribution funciton, p(r)')
 
     ## plot scattering, log-log
-    if xscale_log:
-        ax[1].set_xscale('log')
+    ax[1].set_xscale('log')
     ax[1].set_yscale('log')
     ax[1].set_xlabel('q [1/Angstrom]')
     ax[1].set_ylabel('I(q)')
-    ax[1].set_title('Calculated scattering, without noise')
+    ax[1].set_title('Scattering, log-log scale')
     ax[1].legend()
 
     ## plot scattering, lin-log
-    if xscale_log:
-        ax[2].set_xscale('log')
     ax[2].set_yscale('log')
     ax[2].set_xlabel('q [1/Angstrom]')
     ax[2].set_ylabel('I(q)')
-    ax[2].set_title('Simulated scattering, with noise')
+    ax[2].set_title('Scattering, lin-log scale')
     ax[2].legend()
 
     ## figure settings

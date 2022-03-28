@@ -22,7 +22,7 @@
         ,{
             "role"       : "input"
             ,"id"         : "qmin"
-            ,"label"      : "q min [1/Angstrom]"
+            ,"label"      : "q min"
             ,"type"       : "float"
             ,"step"       : 0.01
 	    ,"default"    : 0.001
@@ -31,10 +31,10 @@
         ,{
             "role"       : "input"
             ,"id"         : "qmax"
-            ,"label"      : "q max [1/Angstrom]"
+            ,"label"      : "q max "
             ,"type"       : "float"
             ,"step"       : 0.001
-	    ,"default"    : 0.5
+	    ,"default"    : 1.0
             ,"help"       : "q max, in inverse Angstrom"
         }
         ,{
@@ -53,10 +53,10 @@
             ,"label"      : "Relative noise"
             ,"type"       : "float"
             ,"step"       : 0.01
-            ,"default"    : 1
+            ,"default"    : 1.0
             ,"min"        : 0.0001
             ,"max"        : 10000
-            ,"help"       : "<p>Relative noise on simulated data.</p><p>Min: 0.0001, max: 10000.</p><p> the error is simulated using: sigma = noise*sqrt[(5E6*I)/(0.05*q)], where I,q are calculated from p(r)</p><p>Sedlak, Bruetzel and Lipfert (2017). J. Appl. Cryst. 50, 621-30. Quantitative evaluation of statistical errors in small- angle X-ray scattering measurements (https://doi.org/10.1107/S1600576717003077)</p>"
+            ,"help"       : "<p>Relative noise on simulated data.</p><p>Min: 0.0001, max: 10000.</p><p> the error is simulated using: sigma = noise*sqrt[(10000*I)/(0.9*q)], where I,q are calculated from the p(r)</p><p>Sedlak, Bruetzel and Lipfert (2017). J. Appl. Cryst. 50, 621-30. Quantitative evaluation of statistical errors in small- angle X-ray scattering measurements (https://doi.org/10.1107/S1600576717003077)</p>"
         }
         ,{
             "role"       : "input"
@@ -71,15 +71,15 @@
 #################################################################################################################
         ,{
             "role"       : "input"
-            ,"id"         : "hrinput"
+            ,"id"         : "hrinput_1"
             ,"label"      : "<hr> Model 1 <hr>"
             ,"type"       : "label"
-            ,"colspan"    : 17
+            ,"colspan"    : 13
         }
 #################################################################################################################
         ,{
             "role"       : "input"
-            ,"id"         : "exclude_overlap"
+            ,"id"         : "exclude_overlap_1"
             ,"label"      : "Exclude overlap regions"
             ,"type"       : "checkbox"
 	    ,"checked"    : "true"
@@ -175,7 +175,7 @@
         }
 #################################################################################################################       
         ,{"role": "input","id": "model1","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring","norow": "true","size": 30,"default": "sphere"}
-        ,{"role": "input","id": "a1","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "a1","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b1","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c1","label": " ","type": "float","min": "0","norow": "true"}
 	,{"role": "input","id": "p1","label": " ","type": "float","default": 1,"norow": "true"}
@@ -183,8 +183,8 @@
 	,{"role": "input","id": "y1","label": " ","type": "float","default": 0.0,"norow": "true"}
 	,{"role": "input","id": "z1","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################       
-        ,{"role": "input","id": "model2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose object~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a2","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "model2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a2","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p2","label": " ","type": "float","default": 1,"norow": "true"}
@@ -192,8 +192,8 @@
         ,{"role": "input","id": "y2","label": " ","type": "float","default": 0.0,"norow": "true"}
         ,{"role": "input","id": "z2","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################
-        ,{"role": "input","id": "model3","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose object~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a3","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "model3","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a3","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b3","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c3","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p3","label": " ","type": "float","default": 1,"norow": "true"}
@@ -201,8 +201,8 @@
         ,{"role": "input","id": "y3","label": " ","type": "float","default": 0.0,"norow": "true"}
         ,{"role": "input","id": "z3","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################
-        ,{"role": "input","id": "model4","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose object~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a4","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "model4","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a4","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b4","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c4","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p4","label": " ","type": "float","default": 1,"norow": "true"}
@@ -210,8 +210,8 @@
         ,{"role": "input","id": "y4","label": " ","type": "float","default": 0.0,"norow": "true"}
         ,{"role": "input","id": "z4","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################
-        ,{"role": "input","id": "model5","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose object~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a5","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "model5","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a5","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b5","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c5","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p5","label": " ","type": "float","default": 1,"norow": "true"}
@@ -224,7 +224,7 @@
             ,"id"         : "polydispersity"
             ,"label"      : "Relative polydispersity"
             ,"type"       : "float"
-            ,"step"       : 0.1
+            ,"step"       : 0.01
             ,"default"    : 0.0
             ,"min"        : 0.0
             ,"max"        : 0.2
@@ -235,26 +235,16 @@
             ,"id"         : "eta"
             ,"label"      : "Volume fraction"
             ,"type"       : "float"
-            ,"step"       : 0.1
+            ,"step"       : 0.01
             ,"default"    : 0.0
             ,"min"        : 0.0
             ,"max"        : 0.9
             ,"help"       : "<p>Volume fraction - for high concentration samples.</p><p> Giving rise to a hard sphere structure factor, S(q)</p><p>Min: 0.0 (no structure factor), max: 0.9.</p>"
         }
-	,{
-            "role"       : "input"
-            ,"id"         : "r_hs"
-            ,"label"      : "Hard-sphere radius"
-            ,"type"       : "float"
-            ,"step"       : 5
-            ,"default"    : 50
-            ,"min"        : 0.0
-            ,"help"       : "<p>Hard-sphere interaction radius - for high concentration samples. Has effect only if eta > 0. </p><p> Used in hard sphere structure factor, S(q)</p><p>Min: 0.0.</p>"
-        }
         ,{
             "role"       : "input"
             ,"id"         : "sigma_r"
-            ,"label"      : "Interface roughness [Angstrom]"
+            ,"label"      : "Interface roughness, in Aangstrom"
             ,"type"       : "float"
             ,"step"       : 0.01
             ,"default"    : 0.0
@@ -268,7 +258,7 @@
             ,"id"         : "hrinput_2"
             ,"label"      : "<hr> Model 2 (optional) <hr>"
             ,"type"       : "label"
-            ,"colspan"    : 17
+            ,"colspan"    : 13
         }
 #################################################################################################################        
 	,{
@@ -368,8 +358,8 @@
             ,"help"       : "center of mass z position of object"
         }
 #################################################################################################################
-        ,{"role": "input","id": "model1_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose object~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a1_2","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "model1_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a1_2","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b1_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c1_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p1_2","label": " ","type": "float","default": 1,"norow": "true"}
@@ -377,8 +367,8 @@
         ,{"role": "input","id": "y1_2","label": " ","type": "float","default": 0.0,"norow": "true"}
         ,{"role": "input","id": "z1_2","label": " ","type": "float","default": 0.0,"norow": "true"}	
 #################################################################################################################        
-        ,{"role": "input","id": "model2_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose object~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a2_2","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "model2_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a2_2","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b2_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c2_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p2_2","label": " ","type": "float","default": 1,"norow": "true"}
@@ -386,8 +376,8 @@
         ,{"role": "input","id": "y2_2","label": " ","type": "float","default": 0.0,"norow": "true"}
         ,{"role": "input","id": "z2_2","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################
-        ,{"role": "input","id": "model3_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose object~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a3_2","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "model3_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a3_2","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b3_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c3_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p3_2","label": " ","type": "float","default": 1,"norow": "true"}
@@ -395,8 +385,8 @@
         ,{"role": "input","id": "y3_2","label": " ","type": "float","default": 0.0,"norow": "true"}
         ,{"role": "input","id": "z3_2","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################
-        ,{"role": "input","id": "model4_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose object~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a4_2","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "model4_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a4_2","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b4_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c4_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p4_2","label": " ","type": "float","default": 1,"norow": "true"}
@@ -404,8 +394,8 @@
         ,{"role": "input","id": "y4_2","label": " ","type": "float","default": 0.0,"norow": "true"}
         ,{"role": "input","id": "z4_2","label": " ","type": "float","default": 0.0,"norow": "true"}
 #################################################################################################################
-        ,{"role": "input","id": "model5_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose object~none","norow": "true","size": 30,"default": "none"}
-        ,{"role": "input","id": "a5_2","label": " ","type": "float","min": "0","default": 50,"norow": "true","required"   : "true"}
+        ,{"role": "input","id": "model5_2","label": " ","type": "listbox","values": "Sphere~sphere~Ellipsoid (Tri-axial)~ellipsoid~Cylinder~cylinder~Disc~disc~Cube~cube~Cuboid~cuboid~Hollow sphere~hollow_sphere~Hollow cube~hollow_cube~Cylindrical ring~cyl_ring~Discoidal ring~disc_ring~Choose a model~none","norow": "true","size": 30,"default": "none"}
+        ,{"role": "input","id": "a5_2","label": " ","type": "float","min": "0","default": 100,"norow": "true","required"   : "true"}
         ,{"role": "input","id": "b5_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "c5_2","label": " ","type": "float","min": "0","norow": "true"}
         ,{"role": "input","id": "p5_2","label": " ","type": "float","default": 1,"norow": "true"}
@@ -418,7 +408,7 @@
             ,"id"         : "polydispersity_2"
             ,"label"      : "Relative polydispersity"
             ,"type"       : "float"
-            ,"step"       : 0.1
+            ,"step"       : 0.01
             ,"default"    : 0.0
             ,"min"        : 0.0
             ,"max"        : 0.2
@@ -429,7 +419,7 @@
             ,"id"         : "eta_2"
             ,"label"      : "Volume fraction"
             ,"type"       : "float"
-            ,"step"       : 0.1
+            ,"step"       : 0.01
             ,"default"    : 0.0
             ,"min"        : 0.0
             ,"max"        : 0.9
@@ -437,20 +427,9 @@
         }
         ,{
             "role"       : "input"
-            ,"id"         : "r_hs_2"
-            ,"label"      : "Hard-sphere radius"
-            ,"type"       : "float"
-            ,"step"       : 5
-            ,"default"    : 50
-            ,"min"        : 0.0
-            ,"help"       : "<p>Hard-sphere interaction radius - for high concentration samples. Has effect only if eta > 0.</p><p> Used in hard sphere structure factor, S(q)</p><p>Min: 0.0.</p>"
-        }
-        ,{
-            "role"       : "input"
             ,"id"         : "sigma_r_2"
-            ,"label"      : "Interface roughness [Aangstrom]"
+            ,"label"      : "Interface roughness, in Aangstrom"
             ,"type"       : "float"
-	    ,"size"       : 40
             ,"step"       : 0.01
             ,"default"    : 0.0
             ,"min"        : 0.0
@@ -459,42 +438,12 @@
         }
 #################################################################################################################
         ,{
-            "role"       : "input"
-            ,"id"         : "hrinput_3"
-            ,"label"      : "<hr> Fitting options <hr>"
-            ,"type"       : "label"
-            ,"colspan"    : 17
-        }
-
-#################################################################################################################
-        ,{
-            "role"       : "input"
-            ,"id"         : "xscale_lin"
-            ,"label"      : "Linear xscale (default: logarithmic)"
-            ,"type"       : "checkbox"
-            ,"checked"    : "false"
-            ,"help"       : "<p>Plot resulting scattering on linear x-scale (instead of logarithmic).</p><p> Not interactice, so press Submit again to change the x scales.</p>"
-        }
-	,{
-            "role"       : "input"
-            ,"id"         : "scale_Isim"
-            ,"label"      : "Scale I_sim from Model 2 by:"
-            ,"type"       : "float"
-	    ,"default"    : 100
-	    ,"min"        : 1
-	    ,"max"        : 100000
-	    ,"step"       : 1
-            ,"help"       : "<p>Scale the simulated scattering (with noise) from model 2 by this factor (default: 100).</p><p> Not interactice, so press Submit again to apply changes.</p>"
-        }
-#################################################################################################################
-        ,{
             "role"       : "output"
             ,"id"         : "hroutput"
-            ,"label"      : "<hr> Output, Model 1 <hr>"
+            ,"label"      : "<hr> Output files <hr>"
             ,"type"       : "label"
             ,"colspan"    : 2
         }
-#################################################################################################################
         ,{
             "role"       : "output"
             ,"id"         : "pr"
@@ -530,103 +479,50 @@
             ,"type"       : "file"
             ,"help"       : "Results packaged in a zip file"
         }
-        ,{
-            "role"       : "output"
-            ,"id"         : "Dmax"
-            ,"label"      : "Dmax, Model 1 [Angstrom]"
-            ,"type"       : "text"
-            ,"help"       : "Maximum distance in Model 1"
-        }
-        ,{
-            "role"       : "output"
-            ,"id"         : "Rg"
-            ,"label"      : "Rg, Model 1 [Angstrom]"
-            ,"type"       : "text"
-            ,"help"       : "Radius of gyration of Model 1"
-        }
-#################################################################################################################
 	,{
             "role"       : "output"
-            ,"id"         : "hroutput_2"
-            ,"label"      : "<hr> Output, Model 2 (optional) <hr>"
+            ,"id"         : "label_parameters"
+            ,"label"      : "<hr> Structural output parameters <hr>"
             ,"type"       : "label"
             ,"colspan"    : 2
         }
-#################################################################################################################
         ,{
             "role"       : "output"
-            ,"id"         : "pr_2"
-            ,"label"      : "p(r)"
-            ,"type"       : "file"
-            ,"help"       : "The calculated p(r)"
-        }
-        ,{
-            "role"       : "output"
-            ,"id"         : "Iq_2"
-            ,"label"      : "Intensity, calculated (no errors)"
-            ,"type"       : "file"
-            ,"help"       : "The calculated intensity, I(q)"
-        }
-       ,{
-            "role"       : "output"
-            ,"id"         : "Isim_2"
-            ,"label"      : "Intensity, simulated (with errors)"
-            ,"type"       : "file"
-            ,"help"       : "<p>Simulated intensity, format: q, I(q), sigma.</p><p>sigma simulated using Sedlak et al (https://doi.org/10.1107/S1600576717003077)</p>"
-        }
-        ,{
-            "role"       : "output"
-            ,"id"         : "pdb_2"
-            ,"label"      : "PDB file with model (open e.g. with PyMOL or <a target=_blank href=https://www.rcsb.org/3d-view>PDB-3Dviewer</a>)"
-            ,"type"       : "file"
-            ,"help"       : "<p>PDB file of model, for visualization, e.g. in PyMOL or with online 3Dviewer.</p><p> All points represented as dummy Carbon beads (positive SLD), dummy Oxygen beads (negative SLD) or dummy Hydrogen beads (zero SLD).</p><p> WARNING: The model will not give correct scattering if used as input in, e.g., CRYSOL, PEPSI-SAXS, FOXS, CAPP, etc - it is only for vizualization</p>."
-        }
-        ,{
-            "role"       : "output"
-            ,"id"         : "zip_2"
-            ,"label"      : "Results zipped"
-            ,"type"       : "file"
-            ,"help"       : "Results packaged in a zip file"
-        }
-        ,{
-            "role"       : "output"
-            ,"id"         : "Dmax_2"
-            ,"label"      : "Dmax, Model 2 [Angstrom]"
+            ,"id"         : "Dmax"
+            ,"label"      : "Dmax, monodisperse"
             ,"type"       : "text"
-            ,"help"       : "Maximum distance in Model 2"
-        }
+	    ,"help"       : "Maximum distance in monodisperse particle"
+        }  
         ,{
             "role"       : "output"
-            ,"id"         : "Rg_2"
-            ,"label"      : "Rg, Model 2 [Angstrom]"
+            ,"id"         : "Rg"
+            ,"label"      : "Rg, monodisperse"
             ,"type"       : "text"
-            ,"help"       : "Radius of gyration of model 2"
+            ,"help"       : "Radius of gyration of monodisperse particle"
+        }	
+       	,{
+            "role"       : "output"
+            ,"id"         : "Dmax_poly"
+            ,"label"      : "Dmax, polydisperse"
+            ,"type"       : "text"
+            ,"help"       : "Maximum distance in polydisperse sample"
         }
-#################################################################################################################
+	,{
+            "role"       : "output"
+            ,"id"         : "Rg_poly"
+            ,"label"      : "Rg, polydisperse"
+            ,"type"       : "text"
+            ,"help"       : "Radius of gyration of polydisperse sample"
+        }
         ,{
             "role"       : "output"
             ,"id"         : "label_fig"
-            ,"label"      : "<p><hr> Plots of model, p(r) and scattering <hr></p><p>Upper panel: Model(s) from different angles (red/blue dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: p(r), I(q) on log-log and log-lin scale. </p>"
+            ,"label"      : "<p><hr> Plots of model, p(r) and scattering <hr></p><p>Upper panel: Model(s) from different angles (red dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: p(r), I(q) on log-log and log-lin scale. </p>"
             ,"type"       : "label"
             ,"colspan"    : 2
             ,"help"       : "<p>Upper panel: Model(s) from different angles (red dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: p(r), I(q) on log-log and log-lin scale. </p>"
         }
-#################################################################################################################
         ,{
-            "role"       : "output"
-            ,"id"         : "points"
-            ,"label"      : ""
-            ,"type"       : "image"
-            ,"width"      : "80%"
-        }
-	,{
-            "role"       : "output"
-            ,"id"         : "points_2"
-            ,"label"      : ""
-            ,"type"       : "image"
-            ,"width"      : "80%"
-        }
-	,{
             "role"       : "output"
             ,"id"         : "fig"
             ,"label"      : ""

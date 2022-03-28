@@ -34,16 +34,12 @@ if __name__=='__main__':
     
     pd1 = float(json_variables['polydispersity'])
     eta1 = float(json_variables['eta']) # volume fraction
-    R_HS1 = float(json_variables['r_hs']) # hard-sphere radius
     sr1 = float(json_variables['sigma_r']) # interface roughness
     
     pd2 = float(json_variables['polydispersity_2'])
     eta2 = float(json_variables['eta_2']) # volume fraction
-    R_HS2 = float(json_variables['r_hs_2']) # hard-sphere radius
     sr2 = float(json_variables['sigma_r_2']) # interface roughness
-
-    scale_Isim = float(json_variables['scale_Isim']) # scale simulated intensity of Model 2
-
+    
     folder = json_variables['_base_directory'] # output folder dir
 
     ## read checkboxes and related input
@@ -59,19 +55,11 @@ if __name__=='__main__':
         exclude_overlap_2 = True
     except:
         exclude_overlap_2 = False
-    try:
-        dummy = json_variables['xscale_lin']
-        xscale_log = False
-    except:
-        xscale_log = True
 
     ## setup  messaging in GUI
     message = genapp(json_variables)    
     output = {} # create an empty python dictionary
 
-    ## generate q vector
-    q = generate_q(qmin,qmax,Nq)
-    
     ## check if Model 2 is included
     Number_of_objects = 5
     count_objects_Model2 = 0
@@ -80,21 +68,18 @@ if __name__=='__main__':
         model = json_variables[model_name]
         if model != 'none':
             count_objects_Model2 += 1
-
     if count_objects_Model2 >= 1:
         Models = ['','_2']
         pds    = [pd1,pd2]
         etas   = [eta1,eta2]
-        R_HSs  = [R_HS1,R_HS2]
         srs    = [sr1,sr2]
     else:
         Models = ['']
         pds    = [pd1]
         etas   = [eta1]
-        R_HSs  = [R_HS1]
         srs    = [sr1]
 
-    for (Model,polydispersity,eta,sigma_r,R_HS) in zip(Models,pds,etas,srs,R_HSs):
+    for (Model,polydispersity,eta,sigma_r) in zip(Models,pds,etas,srs):
        
         ## print model number to stdout
         if Model == '':
@@ -206,42 +191,44 @@ if __name__=='__main__':
         time_dist = time.time() - start_dist
         message.udpmessage({"_textarea":"    time dist: %1.2f\n" % time_dist})
         
+        """
+        ################### CALCULATE I(q) using histogram  #####################################
+    
+        ## timing
+        start_pr = time.time()
+        message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram) and I(q) (intensity)...\n"})
+    
+        ## calculate intensity 
+        q,I = calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r,Model)
+
+        ## simulate data
+        qsim,Isim,sigma = simulate_data(q,I,noise,Model)
+
         ################### CALCULATE p(r) #####################################
+        """
 
         ## timing
         start_pr = time.time()
-        message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)...\n"})
+        message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram) and I(q) (intensity)...\n"})
 
         ## calculate p(r) 
         r,pr,Dmax,Rg = calc_pr(dist,Nbins,contrast,polydispersity,Model)
     
         ## send output to GUI
+        time_pr = time.time() - start_pr
         message.udpmessage({"_textarea":"    Dmax              = %1.2f\n" % Dmax})
         message.udpmessage({"_textarea":"    Rg                = %1.2f\n" % Rg})
-        
-        ## timing
-        time_pr = time.time() - start_pr
-        message.udpmessage({"_textarea":"    time p(r): %1.2f sec\n" % time_pr})
+        message.udpmessage({"_textarea":"    time p(r)         : %1.2f sec\n" % time_pr})
 
         ################### CALCULATE I(q) using histogram  #####################################
-        
-        ## timing
-        start_Iq = time.time()
-        message.udpmessage({"_textarea":"\n# Calculating intensity, I(q)...\n"})
-
-        ## calculate structure factor
-        S = calc_S(q,R_HS,eta,Model)
 
         ## calculate intensity 
-        I = calc_Iq(q,r,pr,S,sigma_r,Model)
+        q,I = calc_Iq(r,pr,qmin,qmax,Nq,dist,Dmax,eta,sigma_r,Model)
+        #q,I = calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r,Model)
 
         ## simulate data
-        Isim,sigma = simulate_data(q,I,noise,Model)
+        qsim,Isim,sigma = simulate_data(q,I,noise,Model)
 
-        ## timing
-        time_Iq = time.time() - start_Iq
-        message.udpmessage({"_textarea":"    time I(q): %1.2f sec\n" % time_Iq})
-        
         ################### OUTPUT to GUI #####################################
 
         output["pr%s" % Model] = "%s/pr%s.d" % (folder,Model)
@@ -253,7 +240,7 @@ if __name__=='__main__':
 
         ## save variables for combined plots
         if Model == '':
-            r1,pr1,I1,Isim1,sigma1,S1 = r,pr,I,Isim,sigma,S
+            r1,pr1,q1,I1,qsim1,Isim1,sigma1 = r,pr,q,I,qsim,Isim,sigma 
             x1,y1,z1,p1 = x_new,y_new,z_new,p_new
             if count_objects_Model2 >= 1:
                 # delete unnecessary data (reduce memory usage)
@@ -277,10 +264,10 @@ if __name__=='__main__':
     
     ## plot p(r) and I(q)
     if count_objects_Model2 >= 1:
-        plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r,pr,I,Isim,sigma,S,xscale_log,scale_Isim)
+        plot_results_combined(r1,pr1,q1,I1,qsim1,Isim1,sigma1,r,pr,q,I,qsim,Isim,sigma)
         output["fig"] = "%s/plot_combined.png" % folder
     else:
-        plot_results(q,r1,pr1,I1,Isim1,sigma1,S1,xscale_log)
+        plot_results(r1,pr1,q1,I1,qsim1,Isim1,sigma1)
         output["fig"] = "%s/plot.png" % folder
     
     ## compress (zip) results for output
@@ -294,7 +281,7 @@ if __name__=='__main__':
     
     ## timing for output generation
     time_output = time.time()-start_output
-    message.udpmessage({"_textarea":"    time plots: %1.2f sec\n" % time_output}) 
+    message.udpmessage({"_textarea":"    time output: %1.2f sec\n" % time_output}) 
     
     ## total time
     time_total = time.time()-start_total

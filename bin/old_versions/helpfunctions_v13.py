@@ -435,21 +435,25 @@ def calc_all_contrasts(p_new):
     
     return contrast
 
-def generate_histogram(dist,contrast,r_max,Nbins):
+def generate_histogram(dist,contrast,Dmax,Nbins):
     """
     make histogram of point pairs, h(r), binned after pair-distances, r
     used for calculating scattering (fast Debye)
     dist     : all pairwise distances
     Nbins    : number of bins in h(r)
     contrast : contrast of points
-    r_max    : max distance to include in histogram
     """
-
-    histo,bin_edges = np.histogram(dist,bins=Nbins,weights=contrast,range=(0,r_max)) 
+    histo,bin_edges = np.histogram(dist,bins=Nbins,weights=contrast,range=(0,Dmax)) 
     dr = bin_edges[2]-bin_edges[1]
     r = bin_edges[0:-1]+dr/2
     
     return r,histo
+
+def calc_Dmax(dist,polydispersity):
+    Dmax = np.amax(dist)
+    Dmax *= (1+3*polydispersity)
+
+    return Dmax
 
 def calc_Rg(r,pr):
     """ 
@@ -506,9 +510,14 @@ def generate_q(qmin,qmax,Nq):
     return q
 
 def calc_S(q,R_HS,eta,Model):
-    """
-    calculates a structure factor S(q) given some input parameters
-    """
+
+    ## estimate hard-sphere radius by non-contrast weighted Rg (assume spherical shape)
+    #hist_no_contrast,bin_edges = np.histogram(dist,bins=Nbins,range=(0,Dmax))
+    #dr = bin_edges[2]-bin_edges[1]
+    #r = bin_edges[0:-1]+dr/2
+    #hist_no_contrast = hist_no_contrast/np.amax(hist_no_contrast)
+    #Rg_no_contrast = calc_Rg(r,hist_no_contrast)
+    #R_HS = np.sqrt(5./3.)*Rg_no_contrast
 
     ## calculate (hard-sphere) structure factor 
     S = calc_S_HS(q,R_HS,eta)
@@ -588,28 +597,24 @@ def calc_hr(dist,Nbins,contrast,polydispersity,Model):
     output:
     hr        : pair distance distribution function 
     """
+    
+    ## calculate p(r)
+    Dmax = calc_Dmax(dist,polydispersity)
+    r,hr = generate_histogram(dist,contrast,Dmax,Nbins)
 
-    ## make r range in h(r) histogram slightly larger than Dmax
-    ratio_rmax_dmax = 1.05
-
-    ## calc h(r) with/without polydispersity
+    ## calculate p(r)
     if polydispersity > 0.0:
-        Dmax = np.amax(dist) * (1+3*polydispersity)
-        r_max = Dmax*ratio_rmax_dmax
         N_poly_integral = 9
-        r,hr = generate_histogram(dist,contrast,r_max,Nbins)
         hr = 0.0
         factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
         for factor_d in factor_range:
-            dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,r_max))
+            dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,Dmax*1.5))
             res = (1.0-factor_d)/polydispersity
             w = np.exp(-res**2/2.0) # weight: normal distribution
             vol = factor_d**3 # weight: relative volume, because larger particles scatter more
             hr += dhr*w*vol**2
     else:
-        Dmax = np.amax(dist)
-        r_max = Dmax*ratio_rmax_dmax
-        r,hr = generate_histogram(dist,contrast,r_max,Nbins)
+        hr = histogram1d(dist,bins=Nbins,weights=contrast,range=(0,Dmax*1.5))
     
     ## normalize so hr_max = 1 
     hr /= np.amax(hr) 
@@ -732,12 +737,12 @@ def plot_2D(x_new,y_new,z_new,p_new,max_dimension,Model):
     plt.close()
 
 
-def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
+def plot_results(q,r,pr,I,Isim,sigma,S):
     """
     plot results using matplotlib:
     - p(r) 
-    - calculated scattering
-    - simulated noisy data 
+    - calculated formfactor, P(r) on log-log and lin-lin scale
+    - simulated noisy data on log-log and lin-lin scale
     """
    
     ## plot settings
@@ -750,27 +755,30 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     ax[0].set_ylabel('p(r)')
     ax[0].set_title('Pair distribution funciton, p(r)')
 
-    ## plot scattering
-    if xscale_log:
-        ax[1].set_xscale('log')
+    ## plot scattering, log-log
+    #ax[1].set_xscale('log')
     ax[1].set_yscale('log')
     ax[1].set_xlabel('q [1/Angstrom]')
     ax[1].set_ylabel('I(q)')
-    ax[1].set_title('Calculated scattering, without noise')
+    #ax[1].set_title('Scattering, log-log scale')
+    ax[1].set_title('Theoretical scattering')
     if S[0] < 1.0:
         ax[1].plot(q,S,color='black',label='S(q)')
         ax[1].plot(q,I,color=color,label='I(q) = P(q)*S(q)')
     else:
        ax[1].plot(q,I,color=color,label='I(q)')
+    #ax[1].errorbar(q,Isim,yerr=sigma,linestyle='none',marker='.',color='pink',label='I(q), simulated',zorder=0)
     ax[1].legend()
 
-    ## plot simulated data 
-    if xscale_log:
-        ax[2].set_xscale('log')
+    ## plot scattering, lin-log
     ax[2].set_yscale('log')
     ax[2].set_xlabel('q [1/Angstrom]')
     ax[2].set_ylabel('I(q)')
-    ax[2].set_title('Simulated scattering, with noise')
+    #ax[2].set_title('Scattering, lin-log scale')
+    ax[2].set_title('Simulated scattering')
+    #ax[2].plot(q,I,color=color,label='P(q)')
+    #if S[0] < 1.0:
+    #    ax[2].plot(q,S,color='black',label='S(q)')
     ax[2].errorbar(q,Isim,yerr=sigma,linestyle='none',marker='.',color='pink',label='I(q), simulated',zorder=0)
     ax[2].legend()
 
@@ -779,7 +787,7 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     plt.savefig('plot.png')
     plt.close()
 
-def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,xscale_log,scale_Isim):
+def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2):
     """
     plot results (combined = Model 1 and Model 2), using matplotlib:
     - p(r) 
@@ -789,18 +797,18 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
 
     fig,ax = plt.subplots(1,3,figsize=(15,5))
 
-    for (r,pr,I,Isim,sigma,S,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],['red','blue'],['pink','skyblue'],['-','--'],[1,scale_Isim],[1,2]):
+    for (r,pr,I,Isim,sigma,S,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],['red','blue'],['pink','skyblue'],['-','--'],[1,100],[4,3]):
         ax[0].plot(r,pr,linestyle=line,color=col,zorder=zo,label='p(r), Model %d' % model)
         if scale > 1: 
             #ax[1].plot(q,I*scale,linestyle=line,color=col,zorder=zo,label='P(q), Model %d, scaled by %d' % (model,scale))
             #ax[2].plot(q,I*scale,linestyle=line,color=col,label='P(q), Model %d, scaled by %d' % (model,scale))
             #ax[1].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='I(q), simulated, scaled by %d' % scale,zorder=zo-2)
-            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d, scaled by %d' % (model,scale),zorder=3-zo)
+            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d, scaled by %d' % (model,scale),zorder=zo-2)
         else:
             #ax[1].plot(q,I*scale,linestyle=line,color=col,zorder=zo,label='P(q), Model %d' % model)
             #ax[2].plot(q,I*scale,linestyle=line,color=col,label='P(q), Model %d' % model)
             #ax[1].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='I(q), simulated',zorder=zo-2)
-            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q)',zorder=zo)
+            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q)',zorder=zo-2)
         if S[0] < 1.0:
             ax[1].plot(q,S,color='black',label='S(q), Model %d' % model,zorder=0)
             ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q)=P(q)*S(q), Model %d' % model)
@@ -813,21 +821,20 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
     ax[0].set_title('Pair distribution funciton, p(r)')
 
     ## plot scattering, log-log
-    if xscale_log:
-        ax[1].set_xscale('log')
+    #ax[1].set_xscale('log')
     ax[1].set_yscale('log')
     ax[1].set_xlabel('q [1/Angstrom]')
     ax[1].set_ylabel('I(q)')
-    ax[1].set_title('Calculated scattering, without noise')
+    #ax[1].set_title('Scattering, log-log scale')
+    ax[1].set_title('Theoretical scattering')
     ax[1].legend()
 
     ## plot scattering, lin-log
-    if xscale_log:
-        ax[2].set_xscale('log')
     ax[2].set_yscale('log')
     ax[2].set_xlabel('q [1/Angstrom]')
     ax[2].set_ylabel('I(q)')
-    ax[2].set_title('Simulated scattering, with noise')
+    #ax[2].set_title('Scattering, lin-log scale')
+    ax[2].set_title('Simulated data')
     ax[2].legend()
 
     ## figure settings

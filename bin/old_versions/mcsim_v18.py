@@ -34,16 +34,12 @@ if __name__=='__main__':
     
     pd1 = float(json_variables['polydispersity'])
     eta1 = float(json_variables['eta']) # volume fraction
-    R_HS1 = float(json_variables['r_hs']) # hard-sphere radius
     sr1 = float(json_variables['sigma_r']) # interface roughness
     
     pd2 = float(json_variables['polydispersity_2'])
     eta2 = float(json_variables['eta_2']) # volume fraction
-    R_HS2 = float(json_variables['r_hs_2']) # hard-sphere radius
     sr2 = float(json_variables['sigma_r_2']) # interface roughness
-
-    scale_Isim = float(json_variables['scale_Isim']) # scale simulated intensity of Model 2
-
+    
     folder = json_variables['_base_directory'] # output folder dir
 
     ## read checkboxes and related input
@@ -59,53 +55,24 @@ if __name__=='__main__':
         exclude_overlap_2 = True
     except:
         exclude_overlap_2 = False
-    try:
-        dummy = json_variables['xscale_lin']
-        xscale_log = False
-    except:
-        xscale_log = True
 
     ## setup  messaging in GUI
-    message = genapp(json_variables)    
-    output = {} # create an empty python dictionary
-
-    ## generate q vector
-    q = generate_q(qmin,qmax,Nq)
+    message = genapp(json_variables)
     
-    ## check if Model 2 is included
-    Number_of_objects = 5
-    count_objects_Model2 = 0
-    for i in range(Number_of_objects):
-        model_name = 'model%d%s' % (i+1,'_2')
-        model = json_variables[model_name]
-        if model != 'none':
-            count_objects_Model2 += 1
-
-    if count_objects_Model2 >= 1:
-        Models = ['','_2']
-        pds    = [pd1,pd2]
-        etas   = [eta1,eta2]
-        R_HSs  = [R_HS1,R_HS2]
-        srs    = [sr1,sr2]
-    else:
-        Models = ['']
-        pds    = [pd1]
-        etas   = [eta1]
-        R_HSs  = [R_HS1]
-        srs    = [sr1]
-
-    for (Model,polydispersity,eta,sigma_r,R_HS) in zip(Models,pds,etas,srs,R_HSs):
+    output = {} # create an empty python dictionary
+    for (Model,polydispersity,eta,sigma_r) in zip(['','_2'],[pd1,pd2],[eta1,eta2],[sr1,sr2]):
        
         ## print model number to stdout
         if Model == '':
             model_number = 1
         elif Model == '_2':
             model_number = 2
-        message.udpmessage({"_textarea":"\n#####################################################\n" })
-        message.udpmessage({"_textarea":"##########   MODEL %s   ##############################\n" % model_number })
-        message.udpmessage({"_textarea":"#####################################################\n" })
+        message.udpmessage({"_textarea":"\n#############################################\n" })
+        message.udpmessage({"_textarea":"##   MODEL %s   ##############################\n" % model_number })
+        message.udpmessage({"_textarea":"#############################################\n" })
         
         ## read model parameters
+        Number_of_objects = 5
         model,a,b,c,p,x,y,z = [],[],[],[],[],[],[],[]
         for i in range(Number_of_objects) :
             number = i+1
@@ -168,7 +135,10 @@ if __name__=='__main__':
         ## generate points
         N,rho,N_exclude,volume,x_new,y_new,z_new,p_new = gen_all_points(Number_of_objects,x,y,z,model,a,b,c,p,exclude_overlap)
 
-        ## vizualization: generate pdb file with points
+        ## vizualization part 1: plot 2D projections
+        plot_2D(x_new,y_new,z_new,p_new,Model)
+
+        ## vizualization part 2: generate pdb file with points
         generate_pdb(x_new,y_new,z_new,p_new,Model)
 
         ## end time for point generation
@@ -201,100 +171,86 @@ if __name__=='__main__':
 
         ## calculate all pair-wise contrasts
         contrast = calc_all_contrasts(p_new)
-        
-        ## timing
+
+        ## delete unnecessary data (reduce memory usage)
+        del x_new,y_new,z_new,p_new
+    
         time_dist = time.time() - start_dist
         message.udpmessage({"_textarea":"    time dist: %1.2f\n" % time_dist})
-        
-        ################### CALCULATE p(r) #####################################
-
-        ## timing
-        start_pr = time.time()
-        message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)...\n"})
-
-        ## calculate p(r) 
-        r,pr,Dmax,Rg = calc_pr(dist,Nbins,contrast,polydispersity,Model)
-    
-        ## send output to GUI
-        message.udpmessage({"_textarea":"    Dmax              = %1.2f\n" % Dmax})
-        message.udpmessage({"_textarea":"    Rg                = %1.2f\n" % Rg})
-        
-        ## timing
-        time_pr = time.time() - start_pr
-        message.udpmessage({"_textarea":"    time p(r): %1.2f sec\n" % time_pr})
 
         ################### CALCULATE I(q) using histogram  #####################################
-        
+    
         ## timing
-        start_Iq = time.time()
-        message.udpmessage({"_textarea":"\n# Calculating intensity, I(q)...\n"})
-
-        ## calculate structure factor
-        S = calc_S(q,R_HS,eta,Model)
-
+        start_pr = time.time()
+        message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram) and I(q) (intensity)...\n"})
+    
         ## calculate intensity 
-        I = calc_Iq(q,r,pr,S,sigma_r,Model)
+        q,I,r,Dmax = calc_Iq(qmin,qmax,Nq,Nbins,dist,contrast,polydispersity,eta,sigma_r,Model)
 
         ## simulate data
-        Isim,sigma = simulate_data(q,I,noise,Model)
+        qsim,Isim,sigma = simulate_data(q,I,noise,Model)
 
-        ## timing
-        time_Iq = time.time() - start_Iq
-        message.udpmessage({"_textarea":"    time I(q): %1.2f sec\n" % time_Iq})
-        
-        ################### OUTPUT to GUI #####################################
+        ################### CALCULATE p(r) #####################################
+    
+        # calculate p(r) 
+        pr = calc_pr(dist,Nbins,contrast,Dmax,polydispersity,r,Model)
+    
+        # calculate Rg
+        Rg = calc_Rg(r,pr)
 
-        output["pr%s" % Model] = "%s/pr%s.d" % (folder,Model)
-        output["Iq%s" % Model] = "%s/Iq%s.d" % (folder,Model)
-        output["Isim%s" % Model] = "%s/Isim%s.d" % (folder,Model)
-        output["pdb%s" % Model] = "%s/model%s.pdb" % (folder,Model)
-        output["Dmax%s" % Model] = "%1.2f" % Dmax
-        output["Rg%s" % Model] = "%1.2f" % Rg
+        ## output
+        time_pr = time.time() - start_pr
+        message.udpmessage({"_textarea":"    Dmax              = %1.2f\n" % Dmax})
+        message.udpmessage({"_textarea":"    Rg                = %1.2f\n" % Rg})
+        message.udpmessage({"_textarea":"    time p(r)         : %1.2f sec\n" % time_pr})
 
-        ## save variables for combined plots
+        ################### GENERATE OUTPUT TO GUI  #####################################
+    
+        ## start time for output generation
+        start_output = time.time()
+
+        ## generate plots of p(r) and I(q) 
+        message.udpmessage({"_textarea":"\n# Making plots of p(r) and I(q)...\n"})
+        plot_results(r,pr,q,I,qsim,Isim,sigma,Model)
+
+        ## compress output files to zip file
+        os.system('zip results%s.zip pr%s.d Iq%s.d Isim%s.d model%s.pdb points%s.png plot%s.png' % (Model,Model,Model,Model,Model,Model,Model))
+
+        ## structure output to GUI
         if Model == '':
-            r1,pr1,I1,Isim1,sigma1,S1 = r,pr,I,Isim,sigma,S
-            x1,y1,z1,p1 = x_new,y_new,z_new,p_new
-            if count_objects_Model2 >= 1:
-                # delete unnecessary data (reduce memory usage)
-                del x_new,y_new,z_new,p_new
+            output["pr"] = "%s/pr%s.d" % (folder,Model)
+            output["Iq"] = "%s/Iq%s.d" % (folder,Model)
+            output["Isim"] = "%s/Isim%s.d" % (folder,Model)
+            output["pdb"] = "%s/model%s.pdb" % (folder,Model)
+            output["points"] = "%s/points%s.png" % (folder,Model)
+            #output["fig1"] = "%s/plot%s.png" % (folder,Model)
+            output["zip"] = "%s/results%s.zip" % (folder,Model)
+            output["Dmax"] = "%1.2f" % Dmax
+            output["Rg"] = "%1.2f" % Rg
+        elif Model == '_2':
+            output["pr_2"] = "%s/pr%s.d" % (folder,Model)
+            output["Iq_2"] = "%s/Iq%s.d" % (folder,Model)
+            output["Isim_2"] = "%s/Isim%s.d" % (folder,Model)
+            output["pdb_2"] = "%s/model%s.pdb" % (folder,Model)
+            output["points_2"] = "%s/points%s.png" % (folder,Model)
+            #output["fig2"] = "%s/plot%s.png" % (folder,Model)
+            output["zip_2"] = "%s/results%s.zip" % (folder,Model)
+            output["Dmax_2"] = "%1.2f" % Dmax
+            output["Rg_2"] = "%1.2f" % Rg
 
-    ################### GENERATING PLOTS  #####################################
-    
-    ## start time for output generation
-    start_output = time.time()
-    
-    ## generate plots of p(r) and I(q) 
-    message.udpmessage({"_textarea":"\n# Making plots of p(r) and I(q)...\n"})
-    
-    ## plot 2D projections
-    if count_objects_Model2 >= 1:
-        max_dimension = get_max_dimension(x1,y1,z1,x_new,y_new,z_new)
-        for (x,y,z,p,Model) in zip([x1,x_new],[y1,y_new],[z1,z_new],[p1,p_new],Models):
-            plot_2D(x,y,z,p,max_dimension,Model)
-    else:
-        plot_2D(x_new,y_new,z_new,p_new,0,Model)
-    
-    ## plot p(r) and I(q)
-    if count_objects_Model2 >= 1:
-        plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r,pr,I,Isim,sigma,S,xscale_log,scale_Isim)
-        output["fig"] = "%s/plot_combined.png" % folder
-    else:
-        plot_results(q,r1,pr1,I1,Isim1,sigma1,S1,xscale_log)
-        output["fig"] = "%s/plot.png" % folder
-    
-    ## compress (zip) results for output
-    for Model in Models:
-        output["points%s" % Model] = "%s/points%s.png" % (folder,Model)
-        os.system('zip results%s.zip pr%s.d Iq%s.d Sq%s.d Isim%s.d model%s.pdb points%s.png plot_combined.png' % (Model,Model,Model,Model,Model,Model,Model))
-        output["zip%s" % Model] = "%s/results%s.zip" % (folder,Model)
+        ## timing for output generation
+        time_output = time.time()-start_output
+        message.udpmessage({"_textarea":"    time output: %1.2f sec\n" % time_output}) 
+
+        #save variables for combined plots
+        if Model == '':
+            r1,pr1,q1,I1,qsim1,Isim1,sigma1 = r,pr,q,I,qsim,Isim,sigma
+
+    plot_results_combined(r1,pr1,q1,I1,qsim1,Isim1,sigma1,r,pr,q,I,qsim,Isim,sigma)
+    output["fig"] = "%s/plot_combined.png" % folder
 
     #output['_textarea'] = "JSON output from executable:\n" + json.dumps( output, indent=4 ) + "\n\n";
     #output['_textarea'] += "JSON input to executable:\n" + json.dumps( json_variables, indent=4 ) + "\n";
-    
-    ## timing for output generation
-    time_output = time.time()-start_output
-    message.udpmessage({"_textarea":"    time plots: %1.2f sec\n" % time_output}) 
     
     ## total time
     time_total = time.time()-start_total
