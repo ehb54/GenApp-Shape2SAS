@@ -186,6 +186,8 @@ if __name__=='__main__':
                 if exclude_overlap:
                     message.udpmessage({"_textarea":"       excluded points    : %d (overlap region)\n" % N_exclude[i]})
                     message.udpmessage({"_textarea":"       remaining points   : %d (non-overlapping region)\n" % N_remain[i]})
+            else:
+                N_remain.append(0)
         N_total = np.sum(N_remain)
         message.udpmessage({"_textarea":"    total number of points: %d\n" % np.sum(N_total)})
         message.udpmessage({"_textarea":"    time, points: %1.2f\n" % time_points})

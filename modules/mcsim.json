@@ -484,7 +484,7 @@
 	    ,"min"        : 1
 	    ,"max"        : 100000
 	    ,"step"       : 1
-            ,"help"       : "<p>Scale the simulated scattering (with noise) from model 2 by this factor (default: 100).</p><p> Not interactice, so press Submit again to apply changes.</p>"
+            ,"help"       : "<p>Scale the simulated scattering (with noise) from model 2 by this factor (default: 100).</p><p> Not interactive, so press Submit again to apply changes.</p>"
         }
 #################################################################################################################
         ,{

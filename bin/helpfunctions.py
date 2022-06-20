@@ -298,7 +298,10 @@ def gen_all_points(Number_of_models,x_com,y_com,z_com,model,a,b,c,p,exclude_over
             N.append(N_model)
             rho.append(rho_model)
             N_exclude.append(N_x_sum)
-
+        else:
+            N.append(0)
+            rho.append(0.0)
+            N_exclude.append(0)
     return N,rho,N_exclude,volume,x_new,y_new,z_new,p_new
 
 def append_points(x_new,y_new,z_new,p_new,x_add,y_add,z_add,p_add):
@@ -333,7 +336,7 @@ def check_overlap(x,y,z,p,x_com,y_com,z_com,model,a,b,c):
     ## effective coordinates, shifted by (x_com,y_com,z_com)
     x_eff,y_eff,z_eff = x-x_com,y-y_com,z-z_com
     
-    ## find indices of excluded points, depending on model
+    ## find indices of non-excluded points, depending on model
     if model in ['sphere','hollow_sphere']:
         SHELL=False
         if model == 'hollow_sphere':
@@ -392,11 +395,15 @@ def check_overlap(x,y,z,p,x_com,y_com,z_com,model,a,b,c):
         else:
             idx = np.where((d>R) | (d<r) | (abs(z_eff)>l/2))
 
-    ## exclude points
-    x_add,y_add,z_add,p_add = x[idx],y[idx],z[idx],p[idx]
-    
-    ## number of excluded points
-    N_x = len(x)-len(idx[0])
+    if model == 'none':
+        ## do not exclude any points
+        x_add,y_add,z_add,p_add = x,y,z,p 
+        N_x = 0
+    else:
+        ## exclude points
+        x_add,y_add,z_add,p_add = x[idx],y[idx],z[idx],p[idx]
+        ## number of excluded points
+        N_x = len(x)-len(idx[0])
     
     return x_add,y_add,z_add,p_add,N_x
 
