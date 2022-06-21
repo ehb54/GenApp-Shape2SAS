@@ -94,7 +94,7 @@
             ,"norow"      : "true"
 	    ,"readonly"   : "true"
 	    ,"size"       : 17
-            ,"help"       : "<p>Models and parameters (in Angstrom):</p><p>Sphere; a: Radius, b,c: no effect</p><p> Ellipsoid; a, b, c: semiaxes</p><p> Cylinder/Disc; a, b: semiaxes, c: length</p><p>Cube; a: side length, b,c: no effect</p><p>Cuboid; a: width, b: depth, c: height</p><p>Hollow sphere; a: outer radius, b: inner radius, c: no effect</p><p>Hollow square; a: outer side length, b: inner side length, c: no effect </p><p>Cylindrical/discoidal ring; a: outer radius, b: inner radius, c: length </p>"
+            ,"help"       : "<p>Models and parameters (in Angstrom):</p><p>Sphere; a: Radius, b,c: no effect</p><p> Ellipsoid; a, b, c: semiaxes</p><p> Cylinder/Disc; a, b: semiaxes, c: length</p><p>Cube; a: side length, b,c: no effect</p><p>Cuboid; a: width, b: depth, c: height</p><p>Hollow sphere; a: outer radius, b: inner radius, c: no effect</p><p>Hollow square; a: outer side length, b: inner side length, c: no effect </p><p>Cylindrical/discoidal ring; a: outer radius, b: inner radius, c: length </p><p>Cylinder and Disc is the same model, but differ in default parameters. Same is true for Discoidal and Cylindrical ring.</p>"
         }
 	,{
             "role"       : "input"
@@ -127,7 +127,7 @@
             ,"norow"      : "true"
             ,"readonly"   : "true"
             ,"size"       : 20
-            ,"help"       : "<p>Sphere: no effect</p><p> Ellipsoid: semiaxis </p><p> Cylinder/Disc*: length</p><p>Cube: no effect</p><p>Cuboid: height</p><p>Hollow sphere: no effect </p><p>Hollow square: no effect</p><p>Cylindrical/discoidal ring*: length </p><p>*Cylinder and disc is the same model. They just differe in default paramters. Same is true for discoidal and cylindrical ring.</p>"
+            ,"help"       : "<p>Sphere: no effect</p><p> Ellipsoid: semiaxis </p><p> Cylinder/Disc: length</p><p>Cube: no effect</p><p>Cuboid: height</p><p>Hollow sphere: no effect </p><p>Hollow square: no effect</p><p>Cylindrical/discoidal ring: length </p>"
 	}
         ,{
             "role"       : "input"
@@ -239,7 +239,7 @@
             ,"default"    : 0.0
             ,"min"        : 0.0
             ,"max"        : 0.9
-            ,"help"       : "<p>Volume fraction - for high concentration samples.</p><p> Giving rise to a hard sphere structure factor, S(q)</p><p>Min: 0.0 (no structure factor), max: 0.9.</p>"
+            ,"help"       : "<p>Volume fraction - for high concentration samples.</p><p> Giving rise to a hard sphere structure factor, S(q).</p><p>Applied to the scattering, I(q), but not to the p(r), which is for the monodisperse model.</p><p>Min: 0.0 (no structure factor), max: 0.9.</p>"
         }
 	,{
             "role"       : "input"
@@ -288,7 +288,7 @@
             ,"norow"      : "true"
             ,"readonly"   : "true"
             ,"size"       : 17
-            ,"help"       : "<p>Models and parameters (in Angstrom):</p><p>Sphere; a: Radius, b,c: no effect</p><p> Ellipsoid; a, b, c: semiaxes</p><p> Cylinder/Disc; a, b: semiaxes, c: length</p><p>Cube; a: side length, b,c: no effect</p><p>Cuboid; a: width, b: depth, c: height</p><p>Hollow sphere; a: outer radius, b: inner radius, c: no effect</p><p>Hollow square; a: outer side length, b: inner side length, c: no effect </p><p>Cylindrical/discoidal ring; a: outer radius, b: inner radius, c: length </p>"
+            ,"help"       : "<p>Models and parameters (in Angstrom):</p><p>Sphere; a: Radius, b,c: no effect</p><p> Ellipsoid; a, b, c: semiaxes</p><p> Cylinder/Disc; a, b: semiaxes, c: length</p><p>Cube; a: side length, b,c: no effect</p><p>Cuboid; a: width, b: depth, c: height</p><p>Hollow sphere; a: outer radius, b: inner radius, c: no effect</p><p>Hollow square; a: outer side length, b: inner side length, c: no effect </p><p>Cylindrical/discoidal ring; a: outer radius, b: inner radius, c: length </p><p>Cylinder and Disc is the same model, but differ in default parameters. Same is true for Discoidal and Cylindrical ring.</p>"
         }
         ,{
             "role"       : "input"
@@ -321,7 +321,7 @@
             ,"norow"      : "true"
             ,"readonly"   : "true"
             ,"size"       : 20
-            ,"help"       : "<p>Sphere: no effect</p><p> Ellipsoid: semiaxis </p><p> Cylinder/Disc*: length</p><p>Cube: no effect</p><p>Cuboid: height</p><p>Hollow sphere: no effect </p><p>Hollow square: no effect</p><p>Cylindrical/discoidal ring*: length </p><p>*Cylinder and disc is the same model. They just differe in default paramters. Same is true for discoidal and cylindrical ring.</p>"
+            ,"help"       : "<p>Sphere: no effect</p><p> Ellipsoid: semiaxis </p><p> Cylinder/Disc: length</p><p>Cube: no effect</p><p>Cuboid: height</p><p>Hollow sphere: no effect </p><p>Hollow square: no effect</p><p>Cylindrical/discoidal ring: length </p>"
         }
         ,{
             "role"       : "input"
@@ -433,7 +433,7 @@
             ,"default"    : 0.0
             ,"min"        : 0.0
             ,"max"        : 0.9
-            ,"help"       : "<p>Volume fraction - for high concentration samples.</p><p> Giving rise to a hard sphere structure factor, S(q)</p><p>Min: 0.0 (no structure factor), max: 0.9.</p>"
+            ,"help"       : "<p>Volume fraction - for high concentration samples.</p><p> Giving rise to a hard sphere structure factor, S(q)</p><p>Applied to the scattering, I(q), but not to the p(r), which is for the monodisperse model.</p><p>Min: 0.0 (no structure factor), max: 0.9.</p>"
         }
         ,{
             "role"       : "input"
@@ -606,10 +606,10 @@
         ,{
             "role"       : "output"
             ,"id"         : "label_fig"
-            ,"label"      : "<p><hr> Plots of model, p(r) and scattering <hr></p><p>Upper panel: Model(s) from different angles (red/blue dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: p(r), I(q) on log-log and log-lin scale. </p>"
+            ,"label"      : "<p><hr> Plots of model, p(r) and scattering <hr></p><p>Upper panel: Model(s) from different angles (red/blue dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: calculated p(r) and I(q), and simulated I(q) - with noise. </p>"
             ,"type"       : "label"
             ,"colspan"    : 2
-            ,"help"       : "<p>Upper panel: Model(s) from different angles (red dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: p(r), I(q) on log-log and log-lin scale. </p>"
+            ,"help"       : "<p>Upper panel: Model(s) from different angles (red dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: calculated p(r) and I(q), and simulated I(q) - with noise. </p>"
         }
 #################################################################################################################
         ,{

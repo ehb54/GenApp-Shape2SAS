@@ -262,7 +262,11 @@ if __name__=='__main__':
                 del x_new,y_new,z_new,p_new
 
     ################### GENERATING PLOTS  #####################################
-    
+
+    message.udpmessage({"_textarea":"\n#####################################################\n" })
+    message.udpmessage({"_textarea":"##########   PLOTS AND OUTPUT  ######################\n"})
+    message.udpmessage({"_textarea":"#####################################################\n" })
+
     ## start time for output generation
     start_output = time.time()
     

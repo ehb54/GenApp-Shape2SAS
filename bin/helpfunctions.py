@@ -755,31 +755,31 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     ax[0].plot(r,pr,color=color,label='p(r), monodisperse')
     ax[0].set_xlabel('r [Angstrom]')
     ax[0].set_ylabel('p(r)')
-    ax[0].set_title('Pair distribution funciton, p(r)')
+    ax[0].set_title('pair distance distribution function')
 
-    ## plot scattering
+    ## plot calculated scattering
     if xscale_log:
         ax[1].set_xscale('log')
     ax[1].set_yscale('log')
     ax[1].set_xlabel('q [1/Angstrom]')
     ax[1].set_ylabel('I(q)')
-    ax[1].set_title('Calculated scattering, without noise')
+    ax[1].set_title('calculated scattering, without noise')
     if S[0] < 1.0:
         ax[1].plot(q,S,color='black',label='S(q)')
         ax[1].plot(q,I,color=color,label='I(q) = P(q)*S(q)')
     else:
        ax[1].plot(q,I,color=color,label='I(q)')
-    ax[1].legend()
+    ax[1].legend(frameon=False)
 
-    ## plot simulated data 
+    ## plot simulated scattering 
     if xscale_log:
         ax[2].set_xscale('log')
     ax[2].set_yscale('log')
     ax[2].set_xlabel('q [1/Angstrom]')
     ax[2].set_ylabel('I(q)')
-    ax[2].set_title('Simulated scattering, with noise')
-    ax[2].errorbar(q,Isim,yerr=sigma,linestyle='none',marker='.',color='pink',label='I(q), simulated',zorder=0)
-    ax[2].legend()
+    ax[2].set_title('simulated scattering, with noise')
+    ax[2].errorbar(q,Isim,yerr=sigma,linestyle='none',marker='.',color='firebrick',label='I(q), simulated',zorder=0)
+    ax[2].legend(frameon=False)
 
     ## figure settings
     plt.tight_layout()
@@ -796,7 +796,7 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
 
     fig,ax = plt.subplots(1,3,figsize=(15,5))
 
-    for (r,pr,I,Isim,sigma,S,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],['red','blue'],['pink','skyblue'],['-','--'],[1,scale_Isim],[1,2]):
+    for (r,pr,I,Isim,sigma,S,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],['red','blue'],['firebrick','royalblue'],['-','--'],[1,scale_Isim],[1,2]):
         ax[0].plot(r,pr,linestyle=line,color=col,zorder=zo,label='p(r), Model %d' % model)
         if scale > 1: 
             #ax[1].plot(q,I*scale,linestyle=line,color=col,zorder=zo,label='P(q), Model %d, scaled by %d' % (model,scale))
@@ -809,7 +809,7 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
             #ax[1].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='I(q), simulated',zorder=zo-2)
             ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q)',zorder=zo)
         if S[0] < 1.0:
-            ax[1].plot(q,S,color='black',label='S(q), Model %d' % model,zorder=0)
+            ax[1].plot(q,S,linestyle=line,color='black',label='S(q), Model %d' % model,zorder=0)
             ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q)=P(q)*S(q), Model %d' % model)
         else:
             ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q), Model %d' % model)
@@ -817,7 +817,7 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
     ## plot p(r)
     ax[0].set_xlabel('r [Angstrom]')
     ax[0].set_ylabel('p(r)')
-    ax[0].set_title('Pair distribution funciton, p(r)')
+    ax[0].set_title('pair distance distribution function')
 
     ## plot scattering, log-log
     if xscale_log:
@@ -825,8 +825,8 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
     ax[1].set_yscale('log')
     ax[1].set_xlabel('q [1/Angstrom]')
     ax[1].set_ylabel('I(q)')
-    ax[1].set_title('Calculated scattering, without noise')
-    ax[1].legend()
+    ax[1].set_title('calculated scattering, without noise')
+    ax[1].legend(frameon=False)
 
     ## plot scattering, lin-log
     if xscale_log:
@@ -834,8 +834,8 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
     ax[2].set_yscale('log')
     ax[2].set_xlabel('q [1/Angstrom]')
     ax[2].set_ylabel('I(q)')
-    ax[2].set_title('Simulated scattering, with noise')
-    ax[2].legend()
+    ax[2].set_title('simulated scattering, with noise')
+    ax[2].legend(frameon=False)
 
     ## figure settings
     plt.tight_layout()
