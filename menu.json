@@ -3,15 +3,15 @@
 # "header" : "WillItFit",
  "menu" : [
         { 
-            "id"      : "mcsim_menu",
+            "id"      : "shape2sas_menu",
             "label"   : "Calculations",
             "icon"    : "pngs/simulate.png",
-	    "autorun" : "mcsim",
+	    "autorun" : "shape2sas",
             "startup" : "true",
             "modules" : [ 
                          { 
-                          "id"    : "mcsim",
-                          "label" : "McSim",
+                          "id"    : "shape2sas",
+                          "label" : "Shape2SAS",
 			  "nobutton" : "true"
                          }
                         ]

@@ -79,12 +79,28 @@ def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
     """ 
     generate random uniformly distributed points (x,y,z) in user-defined shape
     model defines the shape in which the points should be placed
-    a,b,c are model parameters
-    x_com,y_com,z_com are the com position
-    Npoints is the number of points to generate
+    
+    input:
+    a,b,c             : geometrical model parameters
+    p                 : excess scattering length density (contrast)
+    x_com,y_com,z_com : centre-of-mass position
+    Npoints           : attempt to generate this number of points
+    
+    output: 
+    x_add,y_add,z_add : coordinates of simulated points
+    p_add             : contrast of each point
+    N_add             : points generated
+    rho               : point density
     """
     
     if model in ['sphere','hollow_sphere']:
+        """
+        a  : (outer) radius
+        b  : (only hollow_sphere) inner radius
+        
+        a shell if b=a (only hollow_sphere)
+
+        """
         SHELL=False
         if model == 'hollow_sphere':
             if b > a:
@@ -119,6 +135,9 @@ def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
             x_add,y_add,z_add = x[idx],y[idx],z[idx]
 
     if model == 'ellipsoid':
+        """
+        a,b,c : axes of tri-axial elllipsoid
+        """
         Volume = 4*np.pi*a*b*c/3
         Volume_max = 2*a*2*b*2*c
         Vratio = Volume_max/Volume
@@ -131,6 +150,10 @@ def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
         x_add,y_add,z_add = x[idx],y[idx],z[idx]
 
     if model in ['cylinder','disc']:
+        """
+        a,b : axes of elliptical cross section
+        l   : cylinder length / disc height
+        """
         l = c
         Volume = np.pi*a*b*l
         Volume_max = 2*a*2*b*l
@@ -144,6 +167,13 @@ def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
         x_add,y_add,z_add = x[idx],y[idx],z[idx]
 
     if model in ['cube','hollow_cube']:
+        """
+        a  : side length
+        b  : (hollow cube only) inner side length
+        
+        a shell if b=a
+
+        """
         SHELL = False
         if model == 'hollow_cube':
             if b > a:
@@ -189,6 +219,9 @@ def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
             x_add,y_add,z_add = x[idx],y[idx],z[idx]
 
     if model == 'cuboid':
+        """
+        a,b,c : side lengths
+        """
         Volume = a*b*c
         N = Npoints
         x = np.random.uniform(-a/2,a/2,N)
@@ -197,6 +230,14 @@ def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
         x_add,y_add,z_add = x,y,z
 
     if model in ['cyl_ring','disc_ring']:
+        """
+        a  : outer radius
+        b  : inner radius
+        l  : length
+
+        a shell if b=a
+
+        """
         SHELL = False
         if b > a:
             R,r,l = b,a,c
@@ -245,14 +286,14 @@ def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
 
 def gen_all_points(Number_of_models,x_com,y_com,z_com,model,a,b,c,p,exclude_overlap):
     """
-    generate points from a collection of shapes
-    calling gen_points() for each shape
+    generate points from a collection of objects
+    calling gen_points() for each object
 
     input:
     x_com,y_com,z_com : center of mass coordinates
-    a,b,c  : model params (see GUI)
-    p      : contrast for each model
-    exclude_overlap : if True, points is removed from overlapping regions (True/False)
+    a,b,c             : model params (see GUI)
+    p                 : contrast for each object
+    exclude_overlap   : if True, points is removed from overlapping regions (True/False)
 
     output:
     N         : number of points in each model (before optional exclusion, see N_exclude)
@@ -260,7 +301,7 @@ def gen_all_points(Number_of_models,x_com,y_com,z_com,model,a,b,c,p,exclude_over
     N_exclude : number of points excluded from each model (due to overlapping regions)
     x_new,y_new,z_new : coordinates of generated points
     p_new     : contrasts for each point 
-    volume    : volume of each model 
+    volume    : volume of each object
     """
 
     ## Total number of points should not exceed N_points_max (due to memory limitations). This number is system-dependent
@@ -421,12 +462,18 @@ def calc_dist(x):
 def calc_all_dist(x_new,y_new,z_new):
     """ 
     calculate all pairwise distances
+    calls calc_dist() for each set of coordinates: x,y,z
+    does a square sum of coordinates
+    convert from matrix to 
     """
     square_sum = 0.0
     for arr in [x_new,y_new,z_new]:
         square_sum += calc_dist(arr)**2
     d = np.sqrt(square_sum)
-    dist = d.reshape(-1)  # reshape is slightly faster than flatten() and ravel()
+    # convert from matrix to array
+    # reshape is slightly faster than flatten() and ravel()
+    dist = d.reshape(-1)
+    # reduce precision, for computational speed
     dist = dist.astype('float32')
 
     return dist
@@ -446,10 +493,17 @@ def generate_histogram(dist,contrast,r_max,Nbins):
     """
     make histogram of point pairs, h(r), binned after pair-distances, r
     used for calculating scattering (fast Debye)
+
+    input
     dist     : all pairwise distances
     Nbins    : number of bins in h(r)
     contrast : contrast of points
     r_max    : max distance to include in histogram
+    
+    output
+    r        : distances of bins
+    histo    : histogram, weighted by contrast
+
     """
 
     histo,bin_edges = np.histogram(dist,bins=Nbins,weights=contrast,range=(0,r_max)) 
@@ -462,36 +516,50 @@ def calc_Rg(r,pr):
     """ 
     calculate Rg from r and p(r)
     """
+    
     sum_pr_r2 = np.sum(pr*r**2)
     sum_pr = np.sum(pr)
     Rg = np.sqrt(abs(sum_pr_r2/sum_pr)/2)
+    
     return Rg
 
-def calc_S_HS(q,R,eta):
+def calc_S_HS(q,eta,R):
     """
-    calculate the hard-sphere potential
+    calculate the hard-sphere structure factor
+    calls function calc_G()
+    
+    input
     q       : momentum transfer
-    R       : estimation of the hard-sphere radius
     eta     : volume fraction
+    R       : estimation of the hard-sphere radius
+    
+    output
+    S_HS    : hard-sphere structure factor
     """
 
     if eta > 0.0:
         A = 2*R*q 
         G = calc_G(A,eta)
-        S = 1/(1 + 24*eta*G/A)
+        S_HS = 1/(1 + 24*eta*G/A)
     else:
-        S = np.ones(len(q))
+        S_HS = np.ones(len(q))
 
-    return S
+    return S_HS
 
 def calc_G(A,eta):
     """ 
     calculate G in the hard-sphere potential
+    
+    input
     A  : 2*R*q
     q  : momentum transfer
     R  : hard-sphere radius
     eta: volume fraction
+    
+    output:
+    G  
     """
+
     a = (1+2*eta)**2/(1-eta)**4
     b = -6*eta*(1+eta/2)**2/(1-eta)**4 
     c = eta * a/2
@@ -501,26 +569,24 @@ def calc_G(A,eta):
     fb = 2*A*sinA+(2-A**2)*cosA-2
     fc = -A**4*cosA + 4*((3*A**2-6)*cosA+(A**3-6*A)*sinA+6)
     G = a*fa/A**2 + b*fb/A**3 + c*fc/A**5
+    
     return G
 
 def generate_q(qmin,qmax,Nq):
     """
     generate q-vector
+    equidistance on linear scale
     """
 
     q = np.linspace(qmin,qmax,Nq)
 
     return q
 
-def calc_S(q,R_HS,eta,Model):
-    """
-    calculates a structure factor S(q) given some input parameters
+def save_S(q,S,Model):
+    """ 
+    save S to file
     """
 
-    ## calculate (hard-sphere) structure factor 
-    S = calc_S_HS(q,R_HS,eta)
-
-    ## save structure factor to file
     with open('Sq%s.d' % Model,'w') as f:
         f.write('# Structure factor, S(q), used in: I(q) = P(q)*S(q)\n')
         f.write('# Default: S(q) = 1.0)\n')
@@ -528,26 +594,100 @@ def calc_S(q,R_HS,eta,Model):
         for (q_i,S_i) in zip(q,S):
             f.write('  %-17.5e%-17.5e\n' % (q_i,S_i))
 
-    return S
-
-def calc_Iq(q,r,pr,S,sigma_r,Model):
+def calc_S_aggr(q,Reff,Naggr):
     """
-    calculates intensity using histogram
+    calculates fractal aggregate structure factor with dimensionality 2
+
+    S_{2,D=2} in Larsen et al 2020, https://doi.org/10.1107/S1600576720006500
+
+    input 
+    q      :
+    Naggr  : number of particles per aggregate
+    Reff   : effective radius of one particle 
+    
+    output
+    S_aggr :
     """
     
-    ## calculate I(q) from p(r)
-    I = 0.0
+    qR = q*Reff
+    S_aggr = 1 + (Naggr-1)/(1+qR**2*Naggr/3)
+
+    return S_aggr
+
+def calc_com_dist(x_new,y_new,z_new,p_new):
+    """ 
+    calc contrast-weighted com distance
+    """
+    x_com,y_com,z_com = np.average(x_new,weights=p_new),np.average(y_new,weights=p_new),np.average(z_new,weights=p_new)
+    dx,dy,dz = x_new-x_com,y_new-y_com,z_new-z_com
+    com_dist = np.sqrt(dx**2+dy**2+dz**2)
+    
+    return com_dist
+
+def calc_A00(q,x_new,y_new,z_new,p_new):
+    """
+    calc zeroth order sph harm, for decoupling approximation
+    """
+    d_new = calc_com_dist(x_new,y_new,z_new,p_new)
+    M = len(q)
+    A00 = np.zeros(M)
+    for i in range(M):
+        qr = q[i]*d_new
+        A00[i] = sum(p_new*sinc(qr))
+    A00 = A00/A00[0] # normalise, A00[0] = 1
+
+    return A00
+
+def calc_Pq(q,r,pr):
+    """
+    calculate form factor using histogram
+    """
+    ## calculate formfactor P(q) from p(r)
+    Pq = 0.0
     for (r_i,pr_i) in zip(r,pr):
         qr = q*r_i
-        I += pr_i*sinc(qr)
-    
-    ## normalization
-    I /= np.amax(I)
+        Pq += pr_i*sinc(qr)
+    Pq /= np.amax(Pq) # normalization
 
-    ## structure factor
-    I *= S
+    return Pq
+
+def decoupling_approx(q,x_new,y_new,z_new,p_new,Pq,S):
+    """
+    modify structure factor with the decoupling approximation
+    for combining structure factors with non-spherical (or polydisperse) objects
+    
+    see, for example, Larsen et al 2020: https://doi.org/10.1107/S1600576720006500
+    and refs therein
+
+    input
+    q
+    x,y,z,p    : coordinates and contrasts
+    Pq         : form factor
+    S          : structure factor
+
+    output
+    S_eff      : effective structure factor, after applying decoupl. approx
+
+    """
+    A00 = calc_A00(q,x_new,y_new,z_new,p_new)
+    const = 1e-3 # add constant in nominator and denominator, for stability (numerical errors for small values dampened)
+    Beta = (A00**2+const)/(Pq+const)
+    S_eff = 1 + Beta*(S-1)
+    
+    return S_eff
+
+def calc_Iq(q,Pq,S_eff,sigma_r,Model):
+    """
+    calculates intensity
+    """
+
+    ## save structure factor to file
+    save_S(q,S_eff,Model)
+    
+    ## multiply formfactor with structure factor
+    I = Pq*S_eff
      
-    ## interface roughness (Skar-Gislinge et al. DOI: 10.1039/c0cp01074j)
+    ## interface roughness (Skar-Gislinge et al. 2011, DOI: 10.1039/c0cp01074j)
     if sigma_r > 0.0:
         roughness = np.exp(-(q*sigma_r)**2/2)
         I *= roughness
@@ -561,6 +701,20 @@ def calc_Iq(q,r,pr,S,sigma_r,Model):
     return I
 
 def simulate_data(q,I,noise,Model):
+    """
+    simulate data using calculated scattering and empirical expression for sigma
+
+    input
+    q,I    : calculated scattering
+    noise  : relative noise (scales the simulated sigmas by a factor)
+    Model  : is it Model 1 or Model 2 (see the GUI)
+
+    output
+    sigma  : simulated noise
+    Isim   : simulated data
+
+    data is also written to a file
+    """
 
     ## simulate exp error
     #input, sedlak errors (https://doi.org/10.1107/S1600576717003077)
@@ -674,20 +828,26 @@ def get_max_dimension(x1,y1,z1,x2,y2,z2):
 def plot_2D(x_new,y_new,z_new,p_new,max_dimension,Model):
     """
     plot 2D-projections of generated points (shapes) using matplotlib:
-    positive contrast in red/blue
+    positive contrast in red/blue (Model 1/Model 2)
     zero contrast in grey
     negative contrast in green
-
+    
+    input
     (x_new,y_new,z_new) : coordinates of simulated points
     p_new               : excess scattering length density (contrast) of simulated points
     max_dimension       : max dimension of previous model (for plot limits)
+    Model               : Model number (1 or 2) from GUI
+
+    output
+    plot      : points_<Model>.png
+
     """
     
     ## find max dimensions of model
     max_x = np.amax(abs(x_new))
     max_y = np.amax(abs(y_new))
     max_z = np.amax(abs(z_new))
-    max_l = np.amax([max_x,max_y,max_z,max_dimension])
+    max_l = np.amax([max_x,max_y,max_z,max_dimension])*1.1
     lim = [-max_l,max_l]
 
     ## find indices of positive, zero and negatative contrast
@@ -696,13 +856,13 @@ def plot_2D(x_new,y_new,z_new,p_new,max_dimension,Model):
     idx_nul = np.where(p_new==0.0)
     
     ## figure settings
-    markersize = 3
+    markersize = 0.5
     if Model == '':
         color = 'red'
     elif Model == '_2':
         color = 'blue'
 
-    f,ax = plt.subplots(1,3,figsize=(15,5))
+    f,ax = plt.subplots(1,3,figsize=(12,4))
     
     ## plot, perspective 1
     ax[0].plot(x_new[idx_pos],z_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color=color)
@@ -738,17 +898,19 @@ def plot_2D(x_new,y_new,z_new,p_new,max_dimension,Model):
     plt.savefig('points%s.png' % Model)
     plt.close()
 
-
 def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     """
     plot results using matplotlib:
     - p(r) 
     - calculated scattering
-    - simulated noisy data 
+    - simulated data with noise
+
+    Shape2SAS uses this function if there is only 1 Model, else plot_results_combined() is used
+
     """
    
     ## plot settings
-    fig,ax = plt.subplots(1,3,figsize=(15,5))
+    fig,ax = plt.subplots(1,3,figsize=(12,4))
     color = 'red'
 
     ## plot p(r)
@@ -764,7 +926,7 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     ax[1].set_xlabel('q [1/Angstrom]')
     ax[1].set_ylabel('I(q)')
     ax[1].set_title('calculated scattering, without noise')
-    if S[0] < 1.0:
+    if S[0] != 1.0 or S[-1] != 1.0:
         ax[1].plot(q,S,color='black',label='S(q)')
         ax[1].plot(q,I,color=color,label='I(q) = P(q)*S(q)')
     else:
@@ -792,34 +954,31 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
     - p(r) 
     - calculated formfactor, P(r) on log-log and lin-lin scale
     - simulated noisy data on log-log and lin-lin scale
+
+    Shape2SAS uses this function if there is 2 Models are opted for in GUI, else plot_results() is used
+
     """
 
-    fig,ax = plt.subplots(1,3,figsize=(15,5))
+    fig,ax = plt.subplots(1,3,figsize=(12,4))
 
     for (r,pr,I,Isim,sigma,S,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],['red','blue'],['firebrick','royalblue'],['-','--'],[1,scale_Isim],[1,2]):
         ax[0].plot(r,pr,linestyle=line,color=col,zorder=zo,label='p(r), Model %d' % model)
         if scale > 1: 
-            #ax[1].plot(q,I*scale,linestyle=line,color=col,zorder=zo,label='P(q), Model %d, scaled by %d' % (model,scale))
-            #ax[2].plot(q,I*scale,linestyle=line,color=col,label='P(q), Model %d, scaled by %d' % (model,scale))
-            #ax[1].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='I(q), simulated, scaled by %d' % scale,zorder=zo-2)
             ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d, scaled by %d' % (model,scale),zorder=3-zo)
         else:
-            #ax[1].plot(q,I*scale,linestyle=line,color=col,zorder=zo,label='P(q), Model %d' % model)
-            #ax[2].plot(q,I*scale,linestyle=line,color=col,label='P(q), Model %d' % model)
-            #ax[1].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='I(q), simulated',zorder=zo-2)
-            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q)',zorder=zo)
-        if S[0] < 1.0:
+            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d' % model,zorder=zo)
+        if S[0] != 1.0 or S[-1] != 1.0:
             ax[1].plot(q,S,linestyle=line,color='black',label='S(q), Model %d' % model,zorder=0)
             ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q)=P(q)*S(q), Model %d' % model)
         else:
             ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q), Model %d' % model)
 
-    ## plot p(r)
+    ## figure settings, p(r)
     ax[0].set_xlabel('r [Angstrom]')
     ax[0].set_ylabel('p(r)')
     ax[0].set_title('pair distance distribution function')
 
-    ## plot scattering, log-log
+    ## figure settings, calculated scattering
     if xscale_log:
         ax[1].set_xscale('log')
     ax[1].set_yscale('log')
@@ -828,7 +987,7 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
     ax[1].set_title('calculated scattering, without noise')
     ax[1].legend(frameon=False)
 
-    ## plot scattering, lin-log
+    ## figure settings, simulated scattering
     if xscale_log:
         ax[2].set_xscale('log')
     ax[2].set_yscale('log')

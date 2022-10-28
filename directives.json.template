@@ -1,11 +1,11 @@
 # this is a project directives file
 # comments are ok but must start the line in this JSON
 {
-  "title"                     : "McSim",
+  "title"                     : "Shape2SAS",
 
 # "genapptest" below could be replaced, but you should probably also then replace "genapptest" in the paths below
 # the application name should not contain any special characters
-  "application"               : "mcsim",
+  "application"               : "shape2sas",
 
 #  "footer"                    : "Test footer",
 #  "footersize"                : "50px",
@@ -16,11 +16,11 @@
 
   "executable_path"           :
                                 {
-                                 "html5" : "__app_parent_directory__/mcsim/bin",
-                                 "qt3"   : "__app_parent_directory__/mcsim/bin",
-                                 "qt4"   : "__app_parent_directory__/mcsim/bin",
-                                 "qt5"   : "__app_parent_directory__/mcsim/bin",
-                                 "java"  : "__app_parent_directory__/mcsim/bin"
+                                 "html5" : "__app_parent_directory__/shape2sas/bin",
+                                 "qt3"   : "__app_parent_directory__/shape2sas/bin",
+                                 "qt4"   : "__app_parent_directory__/shape2sas/bin",
+                                 "qt5"   : "__app_parent_directory__/shape2sas/bin",
+                                 "java"  : "__app_parent_directory__/shape2sas/bin"
                                 },
 
   "docroot"                   :
@@ -41,20 +41,17 @@
 
 # global hover help texts
   "help"                      : {
-                                 "user_config" : "this is user config help"
-                                 ,"register"    : "this is register help"
-                                 ,"jobs"        : "this is jobs help"
-                                 ,"files"       : "this is file help"
-                                 ,"feedback"    : "this is feedback help"
-                                 ,"docs"        : "this is docs help"
-                                 ,"login"       : "this is login help"
-                                 ,"logoff"      : "this is logoff help"
-                                 ,"help"        : "this is help help"
-                                 ,"project"     : "this is project help"
-                                 ,"menu"        : "this is menu help"
-                                 ,"submit"      : "this is help for the submit button"
-                                 ,"reset"       : "this is help for the reset to default values button"
-                                 ,"apptitle"    : "this is application help"
+       "register"    : "Click to register",
+       "jobs"        : "Job Manager: use to monitor running and finished jobs",
+       "files"       : "File Manager: use to download and remove files",
+       "feedback"    : "Click to provide feedback",
+       "login"       : "Click to login",
+       "logoff"      : "Click to logoff",
+       "submit"      : "Submit job. Shape2sas uses random numbers, so results with same inputs may vary",
+       "help"        : "Toggle to turn help on/off"
+# "docs"        : "Press to open a new web page with documentation"
+# "menu"        : "Toggle this icon to open and close the main menu"
+# "project"     : "Name of current project: use Settings Manager to change"
                                 },
 
   "textarea"                 : {
@@ -171,7 +168,7 @@
 #  ,"usewss"                  : "true"
 
 # the following are currently only meaningful for "html5" language
-  ,"appconfig"                 : "__app_parent_directory__/mcsim/appconfig.json"
+  ,"appconfig"                 : "__app_parent_directory__/shape2sas/appconfig.json"
 
 # if you have a 32 bit mongo system "html5", comment this
   ,"mongojournal"               : "true"
