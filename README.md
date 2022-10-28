@@ -2,7 +2,7 @@
 
 calulating the pair distance distribution function, p(r), and the scattering intensity, I(q), from user-defined shapes
 
-the program is strongly inspired by an old version with the same name (see citation below), but completely rewritten by Andreas Haahr Larsen    
+the program is strongly inspired by an old version named 'mcsim' (see citation below), but completely rewritten by Andreas Haahr Larsen    
 
 ## How to run the program
 
