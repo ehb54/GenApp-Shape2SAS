@@ -1,4 +1,4 @@
-# GenApp-McSim
+# GenApp-Shape2SAS
 
 calulating the pair distance distribution function, p(r), and the scattering intensity, I(q), from user-defined shapes
 
@@ -6,14 +6,14 @@ the program is strongly inspired by an old version with the same name (see citat
 
 ## How to run the program
 
-via the web GUI: https://somo.chem.utk.edu/mcsim/
+via the web GUI: https://somo.chem.utk.edu/Shape2SAS/
 
 ## Files
 
 ### modules/mcsim.json
 GUI
 
-### bin/mcsim.py
+### bin/Shape2SAS.py
 python wrapper.   
 takes input from GUI, send to functions and return output to GUI.   
 
