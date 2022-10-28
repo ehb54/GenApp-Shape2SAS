@@ -6,14 +6,14 @@ the program is strongly inspired by an old version with the same name (see citat
 
 ## How to run the program
 
-via the web GUI: https://somo.chem.utk.edu/Shape2SAS/
+via the web GUI: https://somo.chem.utk.edu/shape2sas/
 
 ## Files
 
-### modules/mcsim.json
+### modules/shape2sas.json
 GUI
 
-### bin/Shape2SAS.py
+### bin/shape2sas.py
 python wrapper.   
 takes input from GUI, send to functions and return output to GUI.   
 
