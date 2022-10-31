@@ -2,7 +2,7 @@
 
 calulating the pair distance distribution function, p(r), and the scattering intensity, I(q), from user-defined shapes
 
-the program is strongly inspired by an old version named 'mcsim' (see citation below), but completely rewritten by Andreas Haahr Larsen    
+the program is strongly inspired by McSim (written by Steen Hansen, see citation below), but completely rewritten by Andreas Haahr Larsen    
 
 ## How to run the program
 
@@ -47,9 +47,4 @@ Emre Brookes, who maintains GenApp and supports development of new programs and 
 
 ## Contact
 Andreas Haahr Larsen    
-andreas.larsen(at)sund.ku.dk 
-
-## Planned changes/ideas    
-make papar, presenting the program in and educational context   
-add more strucutre factors (other than hard-sphere)   
-add option for comparison with (and fit to?) experimental data   
+andreas.larsen(at)sund.ku.dk  
