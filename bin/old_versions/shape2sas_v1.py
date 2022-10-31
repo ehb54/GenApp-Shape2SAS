@@ -308,8 +308,6 @@ if __name__=='__main__':
         output["pdb%s" % Model] = "%s/model%s.pdb" % (folder,Model)
         output["Dmax%s" % Model] = "%1.2f" % Dmax
         output["Rg%s" % Model] = "%1.2f" % Rg
-        output["pdb_jmol%s" % Model] = "%s/model%s.pdb" % (folder,Model)
-        #output["pdbshow"] = folder + "/" + "model.pdb"
 
         ## save variables for combined plots
         if Model == '':
