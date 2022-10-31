@@ -248,7 +248,7 @@ if __name__=='__main__':
 
         ## calculate p(r) 
         r,pr,Dmax,Rg = calc_pr(dist,Nbins,contrast,polydispersity,Model)
-
+    
         ## send output to GUI
         message.udpmessage({"_textarea":"    Dmax              = %1.2f\n" % Dmax})
         message.udpmessage({"_textarea":"    Rg                = %1.2f\n" % Rg})

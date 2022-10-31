@@ -43,7 +43,7 @@
             ,"label"      : "Number of points in q"
             ,"type"       : "integer"
             ,"min"        : 10
-            ,"default"    : 400
+            ,"default"    : 200
             ,"max"        : 2000
             ,"help"       : "<p>Number of points in q.</p><p>Default: 100, Minimum 10, Maximum 2000</p>"
         }
@@ -224,7 +224,7 @@
             ,"id"         : "polydispersity"
             ,"label"      : "Relative polydispersity"
             ,"type"       : "float"
-            ,"step"       : 0.1
+            ,"step"       : 0.05
             ,"default"    : 0.0
             ,"min"        : 0.0
             ,"max"        : 0.2
@@ -249,7 +249,8 @@
             ,"step"       : 5
             ,"default"    : 50
             ,"min"        : 0.0
-            ,"help"       : "<p>Hard-sphere interaction radius - for high concentration samples. Has effect only if eta > 0. </p><p> Used in hard sphere structure factor, S(q)</p><p>Min: 0.0.</p>"
+	    ,"max"        : 1000
+            ,"help"       : "<p>Hard-sphere interaction radius - for high concentration samples. Has effect only if Volume fraction > 0. </p><p> Used in hard sphere structure factor, S(q)</p><p>Min: 0.0.</p><p>Only relevant if Volume fraction > 0. </p>"
         }
         ,{
             "role"       : "input"
@@ -268,6 +269,7 @@
             ,"id"         : "hrinput_2"
             ,"label"      : "<hr> Model 2 (optional) <hr>"
             ,"type"       : "label"
+	    ,"help"       : "Optionally add a second model - for comparison with Model 1"
             ,"colspan"    : 17
         }
 #################################################################################################################        
@@ -418,13 +420,21 @@
             ,"id"         : "polydispersity_2"
             ,"label"      : "Relative polydispersity"
             ,"type"       : "float"
-            ,"step"       : 0.1
+            ,"step"       : 0.05
             ,"default"    : 0.0
             ,"min"        : 0.0
             ,"max"        : 0.2
             ,"help"       : "Relative polydispersity. Min: 0.0 (monodisperse), max: 0.2."
         }
-        ,{
+	,{
+            "role"        : "input"
+	    ,"id"         : "S_HS_2"
+            ,"label"      : "Concentration effect"
+	    ,"type"       : "checkbox"
+	    ,"repeater"   : "true"
+	    ,"help"       : "<p>Add structure factor to scattering</p>"
+	}
+	,{
             "role"       : "input"
             ,"id"         : "eta_2"
             ,"label"      : "Volume fraction"
@@ -433,6 +443,7 @@
             ,"default"    : 0.0
             ,"min"        : 0.0
             ,"max"        : 0.9
+	    ,"repeat"     : "S_HS_2"
             ,"help"       : "<p>Volume fraction - for high concentration samples.</p><p> Giving rise to a hard sphere structure factor, S(q)</p><p>Applied to the scattering, I(q), but not to the p(r), which is for the monodisperse model.</p><p>Min: 0.0 (no structure factor), max: 0.9.</p>"
         }
         ,{
@@ -443,12 +454,46 @@
             ,"step"       : 5
             ,"default"    : 50
             ,"min"        : 0.0
-            ,"help"       : "<p>Hard-sphere interaction radius - for high concentration samples. Has effect only if eta > 0.</p><p> Used in hard sphere structure factor, S(q)</p><p>Min: 0.0.</p>"
+	    ,"max"        : 1000
+	    ,"repeat"     : "S_HS_2"
+            ,"help"       : "<p>Hard-sphere interaction radius - for high concentration samples.</p><p> Used in hard sphere structure factor, S(q)</p><p>Min: 0.0.</p><p>Only relevant if Volume fraction > 0</p>"
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "S_aggr"
+            ,"label"      : "Add aggregates"
+            ,"type"       : "checkbox"
+            ,"repeater"   : "true"
+            ,"help"       : "<p>Add structure factor to aggregates in sample</p>"
+        }
+	,{
+            "role"       : "input"
+            ,"id"         : "frac_aggr_2"
+            ,"label"      : "Fraction of aggregates"
+            ,"type"       : "float"
+            ,"step"       : 0.1
+            ,"default"    : 0.0
+            ,"min"        : 0.0
+	    ,"max"        : 1.0
+	    ,"repeat"     : "S_aggr"
+            ,"help"       : "<p>Fraction of particles that are in aggregated form. </p><p>Aggregates are assumed to form fractal aggregates, included in scattering (not in p(r)) via structure factor S2(q) from Ref:</p><p>Larsen, Pedersen and Arleth (2020). J Appl cryst 2020: Assessment of structure factors for analysis of small-angle scattering data from desired or undesired aggregates</p><p>Min: 0.0 (no aggregates). Max: 1.0 (all particles are aggregated).</p>"
+	}
+	,{
+            "role"       : "input"
+            ,"id"         : "N_aggr_2"
+            ,"label"      : "Particles per aggregate"
+            ,"type"       : "float"
+            ,"step"       : 1
+            ,"default"    : 30
+            ,"min"        : 0
+	    ,"max"        : 1000
+            ,"help"       : "<p>Number of particles per aggregate. </p><p>Only relevant if Fraction of aggregates > 0.</p><p>Min: 0. Max: 1000.</p>"
+	    ,"repeat"     : "S_aggr"
         }
         ,{
             "role"       : "input"
             ,"id"         : "sigma_r_2"
-            ,"label"      : "Interface roughness [Aangstrom]"
+            ,"label"      : "Interface roughness [Angstrom]"
             ,"type"       : "float"
 	    ,"size"       : 40
             ,"step"       : 0.01
@@ -606,10 +651,10 @@
         ,{
             "role"       : "output"
             ,"id"         : "label_fig"
-            ,"label"      : "<p><hr> Plots of model, p(r) and scattering <hr></p><p>Upper panel: Model(s) from different angles (red/blue dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: calculated p(r) and I(q), and simulated I(q) - with noise. </p>"
+            ,"label"      : "<p><hr> Plots of model, p(r) and scattering <hr></p><p>Upper panel: Model(s) from different angles (red/blue dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: calculated p(r), calculated I(q), and simulated I(q) - with noise. </p>"
             ,"type"       : "label"
             ,"colspan"    : 2
-            ,"help"       : "<p>Upper panel: Model(s) from different angles (red dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: calculated p(r) and I(q), and simulated I(q) - with noise. </p>"
+            ,"help"       : "<p>Upper panel: Model(s) from different angles (red dots have positive SLD, green have negative SLD and grey have zero SLD). </p><p>Lower panel: calculated p(r), calculated I(q), and simulated I(q) - with noise. </p>"
         }
 #################################################################################################################
         ,{
