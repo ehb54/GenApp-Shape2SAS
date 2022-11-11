@@ -744,7 +744,7 @@ def calc_hr(dist,Nbins,contrast,polydispersity,Model):
     input: 
     dist      : all pairwise distances
     contrast  : all pair-wise contrast products
-    polydispersity: boolian, True or False
+    polydispersity: relative polydispersity, float
 
     output:
     hr        : pair distance distribution function 
