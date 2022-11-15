@@ -33,10 +33,14 @@ if __name__=='__main__':
     Nbins = int(json_variables['prpoints']) # number of points in p(r)
     
     pd1 = float(json_variables['polydispersity'])
+#    eta1 = float(json_variables['eta']) # volume fraction
+#    R_HS1 = float(json_variables['r_hs']) # hard-sphere radius
     Stype1 = json_variables['S'] # type of structure factore 
     sr1 = float(json_variables['sigma_r']) # interface roughness
     
     pd2 = float(json_variables['polydispersity_2'])
+#    eta2 = float(json_variables['eta_2']) # volume fraction
+#    R_HS2 = float(json_variables['r_hs_2']) # hard-sphere radius
     Stype2 = json_variables['S_2'] # type of structure factore 
     sr2 = float(json_variables['sigma_r_2']) # interface roughness
 
@@ -298,9 +302,9 @@ if __name__=='__main__':
         
         ################### OUTPUT to GUI #####################################
 
-        output["pr%s" % Model] = "%s/pr%s.dat" % (folder,Model)
-        output["Iq%s" % Model] = "%s/Iq%s.dat" % (folder,Model)
-        output["Isim%s" % Model] = "%s/Isim%s.dat" % (folder,Model)
+        output["pr%s" % Model] = "%s/pr%s.d" % (folder,Model)
+        output["Iq%s" % Model] = "%s/Iq%s.d" % (folder,Model)
+        output["Isim%s" % Model] = "%s/Isim%s.d" % (folder,Model)
         output["pdb%s" % Model] = "%s/model%s.pdb" % (folder,Model)
         output["Dmax%s" % Model] = "%1.2f" % Dmax
         output["Rg%s" % Model] = "%1.2f" % Rg
@@ -346,7 +350,7 @@ if __name__=='__main__':
     ## compress (zip) results for output
     for Model in Models:
         output["points%s" % Model] = "%s/points%s.png" % (folder,Model)
-        os.system('zip results%s.zip pr%s.dat Iq%s.dat Sq%s.dat Isim%s.dat model%s.pdb points%s.png plot_combined.png' % (Model,Model,Model,Model,Model,Model,Model))
+        os.system('zip results%s.zip pr%s.d Iq%s.d Sq%s.d Isim%s.d model%s.pdb points%s.png plot_combined.png' % (Model,Model,Model,Model,Model,Model,Model))
         output["zip%s" % Model] = "%s/results%s.zip" % (folder,Model)
 
     #output['_textarea'] = "JSON output from executable:\n" + json.dumps( output, indent=4 ) + "\n\n";

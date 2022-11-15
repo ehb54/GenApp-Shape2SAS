@@ -742,7 +742,7 @@
             ,"label"      : "3D vizualisation of Model 1 (right click for options)"
             ,"type"       : "atomicstructure"
             ,"height"     : "350"
-            ,"width"      : "350"
+            ,"width"      : "900"
             ,"jsmoladd"   : "spin on"
         }
         ,{
@@ -751,7 +751,7 @@
             ,"label"      : "3D vizualisation of Model 2 (right click for options)"
             ,"type"       : "atomicstructure"
             ,"height"     : "350"
-            ,"width"      : "350"
+            ,"width"      : "900"
         }
     ]
 }

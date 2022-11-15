@@ -587,7 +587,7 @@ def save_S(q,S,Model):
     save S to file
     """
 
-    with open('Sq%s.d' % Model,'w') as f:
+    with open('Sq%s.dat' % Model,'w') as f:
         f.write('# Structure factor, S(q), used in: I(q) = P(q)*S(q)\n')
         f.write('# Default: S(q) = 1.0)\n')
         f.write('# %-17s %-17s\n' % ('q','S(q)'))
@@ -693,7 +693,7 @@ def calc_Iq(q,Pq,S_eff,sigma_r,Model):
         I *= roughness
 
     ## save intensity to file
-    with open('Iq%s.d' % Model,'w') as f:
+    with open('Iq%s.dat' % Model,'w') as f:
         f.write('# %-17s %-17s\n' % ('q','I(q)'))
         for (q_i,I_i) in zip(q,I):
             f.write('  %-17.5e %-17.5e\n' % (q_i,I_i))
@@ -727,7 +727,7 @@ def simulate_data(q,I,noise,Model):
     Isim = np.random.normal(mu,sigma)
 
     ## save to file
-    with open('Isim%s.d' % Model,'w') as f:
+    with open('Isim%s.dat' % Model,'w') as f:
         f.write('# Simulated data\n')
         f.write('# sigma generated using Sedlak et al, k=100000, c=0.55, https://doi.org/10.1107/S1600576717003077, and rebinned with 10 per bin)\n')
         f.write('# %-12s %-12s %-12s\n' % ('q','I','sigma'))
@@ -802,7 +802,7 @@ def calc_pr(dist,Nbins,contrast,polydispersity,Model):
     r,pr,Dmax,Rg = calc_hr(dist[idx_nonzero],Nbins,contrast[idx_nonzero],polydispersity,Model)
 
     ## save p(r) to textfile
-    with open('pr%s.d' % Model,'w') as f:
+    with open('pr%s.dat' % Model,'w') as f:
         f.write('# %-17s %-17s\n' % ('r','p(r)'))
         for i in range(Nbins):
             f.write('  %-17.5e %-17.5e\n' % (r[i],pr[i]))
