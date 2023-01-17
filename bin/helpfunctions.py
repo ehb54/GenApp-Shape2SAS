@@ -589,7 +589,7 @@ def save_S(q,S,Model):
 
     with open('Sq%s.dat' % Model,'w') as f:
         f.write('# Structure factor, S(q), used in: I(q) = P(q)*S(q)\n')
-        f.write('# Default: S(q) = 1.0)\n')
+        f.write('# Default: S(q) = 1.0\n')
         f.write('# %-17s %-17s\n' % ('q','S(q)'))
         for (q_i,S_i) in zip(q,S):
             f.write('  %-17.5e%-17.5e\n' % (q_i,S_i))
@@ -618,7 +618,8 @@ def calc_com_dist(x_new,y_new,z_new,p_new):
     """ 
     calc contrast-weighted com distance
     """
-    x_com,y_com,z_com = np.average(x_new,weights=p_new),np.average(y_new,weights=p_new),np.average(z_new,weights=p_new)
+    w = np.abs(p_new)
+    x_com,y_com,z_com = np.average(x_new,weights=w),np.average(y_new,weights=w),np.average(z_new,weights=w)
     dx,dy,dz = x_new-x_com,y_new-y_com,z_new-z_com
     com_dist = np.sqrt(dx**2+dy**2+dz**2)
     
