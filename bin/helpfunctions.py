@@ -619,6 +619,8 @@ def calc_com_dist(x_new,y_new,z_new,p_new):
     calc contrast-weighted com distance
     """
     w = np.abs(p_new)
+    if np.sum(w) == 0:
+        w = np.ones(len(x_new))
     x_com,y_com,z_com = np.average(x_new,weights=w),np.average(y_new,weights=w),np.average(z_new,weights=w)
     dx,dy,dz = x_new-x_com,y_new-y_com,z_new-z_com
     com_dist = np.sqrt(dx**2+dy**2+dz**2)
