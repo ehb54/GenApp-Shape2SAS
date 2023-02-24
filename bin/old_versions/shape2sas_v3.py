@@ -31,7 +31,6 @@ if __name__=='__main__':
     Nq = int(json_variables['qpoints']) # number of points in (simulated) q
     noise = float(json_variables['noise'])
     Nbins = int(json_variables['prpoints']) # number of points in p(r)
-    Npoints = int(json_variables['Npoints']) # max number of points per model
     
     pd1 = float(json_variables['polydispersity'])
     Stype1 = json_variables['S'] # type of structure factore 
@@ -191,10 +190,11 @@ if __name__=='__main__':
 
         ## timing
         start_points = time.time()
-        message.udpmessage({"_textarea":"\n# Generating points\n" })
+        message.udpmessage({"_textarea":"\n# Generating and plotting points\n" })
+        #message.udpmessage({"_textarea":"\n# folder: %s \n" % folder })
 
         ## generate points
-        N,rho,N_exclude,volume_total,x_new,y_new,z_new,p_new = gen_all_points(Number_of_objects,Npoints,x,y,z,model,a,b,c,p,exclude_overlap)
+        N,rho,N_exclude,volume,x_new,y_new,z_new,p_new = gen_all_points(Number_of_objects,x,y,z,model,a,b,c,p,exclude_overlap)
 
         ## vizualization: generate pdb file with points
         generate_pdb(x_new,y_new,z_new,p_new,Model)
@@ -217,9 +217,8 @@ if __name__=='__main__':
             else:
                 N_remain.append(0)
         N_total = np.sum(N_remain)
-        message.udpmessage({"_textarea":"    total number of points: %d\n" % N_total})
-        message.udpmessage({"_textarea":"    total volume          : %1.1f A^3\n" % volume_total})
-        message.udpmessage({"_textarea":"    time, points          : %1.2f sec\n" % time_points})
+        message.udpmessage({"_textarea":"    total number of points: %d\n" % np.sum(N_total)})
+        message.udpmessage({"_textarea":"    time, points: %1.2f\n" % time_points})
 
         ################### CALCULATE PAIR-WISE DISTANCES FOR ALL POINTS  #####################################
     
@@ -232,7 +231,7 @@ if __name__=='__main__':
 
         ## calculate all pair-wise contrasts
         contrast = calc_all_contrasts(p_new)
-
+        
         ## timing
         time_dist = time.time() - start_dist
         message.udpmessage({"_textarea":"    time dist: %1.2f\n" % time_dist})
@@ -244,12 +243,11 @@ if __name__=='__main__':
         message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)...\n"})
 
         ## calculate p(r) 
-        r,pr,pr_norm,Dmax,Rg = calc_pr(dist,Nbins,contrast,polydispersity,Model)
-        pr /= N_total**2 # make p(r) independent on number of points per model
+        r,pr,Dmax,Rg = calc_pr(dist,Nbins,contrast,polydispersity,Model)
 
         ## send output to GUI
-        message.udpmessage({"_textarea":"    Dmax : %1.2f A\n" % Dmax})
-        message.udpmessage({"_textarea":"    Rg   : %1.2f A\n" % Rg})
+        message.udpmessage({"_textarea":"    Dmax              = %1.2f\n" % Dmax})
+        message.udpmessage({"_textarea":"    Rg                = %1.2f\n" % Rg})
         
         ## timing
         time_pr = time.time() - start_pr
@@ -270,11 +268,8 @@ if __name__=='__main__':
         if sigma_r > 0:
             message.udpmessage({"_textarea":"    sigma_r           = %1.2f\n" % sigma_r})
 
-        ## calculate forward scattering and form factor
-        I0,Pq = calc_Pq(q,r,pr)
-        
-        I0 *= (volume_total)**2*1E-12 # make I0 scale with volume squared and scale to realistic numbers
-        message.udpmessage({"_textarea":"    I(0): %1.2e\n" % I0}) 
+        ## calculate form factor
+        Pq = calc_Pq(q,r,pr)
 
         ## calculate structure factor
         if Stype == 'HS':
@@ -287,16 +282,15 @@ if __name__=='__main__':
             S = np.ones(len(q))
         # decoupling approx
         S_eff = decoupling_approx(q,x_new,y_new,z_new,p_new,Pq,S)
-        #S_eff = S
         # fraction of aggregates
         if Stype == 'Aggr':
             S_eff = (1-frac) + frac*S_eff
 
-        ## calculate normalised intensity = P(q)*S(q) 
+        ## calculate intensity 
         I = calc_Iq(q,Pq,S_eff,sigma_r,Model)
          
         ## simulate data
-        Isim,sigma = simulate_data(q,I,I0,noise,Model)
+        Isim,sigma = simulate_data(q,I,noise,Model)
 
         ## timing
         time_Iq = time.time() - start_Iq
@@ -315,7 +309,7 @@ if __name__=='__main__':
 
         ## save variables for combined plots
         if Model == '':
-            r1,pr_norm1,I1,Isim1,sigma1,S_eff1 = r,pr_norm,I,Isim,sigma,S_eff
+            r1,pr1,I1,Isim1,sigma1,S_eff1 = r,pr,I,Isim,sigma,S_eff
             x1,y1,z1,p1 = x_new,y_new,z_new,p_new
             if count_objects_Model2 >= 1:
                 # delete unnecessary data (reduce memory usage)
@@ -343,10 +337,10 @@ if __name__=='__main__':
     
     ## plot p(r) and I(q)
     if count_objects_Model2 >= 1:
-        plot_results_combined(q,r1,pr_norm1,I1,Isim1,sigma1,S_eff1,r,pr_norm,I,Isim,sigma,S_eff,xscale_log,scale_Isim)
+        plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S_eff1,r,pr,I,Isim,sigma,S_eff,xscale_log,scale_Isim)
         output["fig"] = "%s/plot_combined.png" % folder
     else:
-        plot_results(q,r1,pr_norm1,I1,Isim1,sigma1,S_eff1,xscale_log)
+        plot_results(q,r1,pr1,I1,Isim1,sigma1,S_eff1,xscale_log)
         output["fig"] = "%s/plot.png" % folder
     
     ## compress (zip) results for output
@@ -369,3 +363,4 @@ if __name__=='__main__':
     ## send output to GUI
     print( json.dumps(output) ) # convert dictionary to json and output
 
+    

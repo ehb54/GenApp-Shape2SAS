@@ -284,30 +284,28 @@ def gen_points(x_com,y_com,z_com,model,a,b,c,p,Npoints):
      
     return x_add,y_add,z_add,p_add,N_add,rho 
 
-def gen_all_points(Number_of_models,Npoints,x_com,y_com,z_com,model,a,b,c,p,exclude_overlap):
+def gen_all_points(Number_of_models,x_com,y_com,z_com,model,a,b,c,p,exclude_overlap):
     """
     generate points from a collection of objects
     calling gen_points() for each object
 
     input:
-    Npoints           : max number of points per model
     x_com,y_com,z_com : center of mass coordinates
     a,b,c             : model params (see GUI)
     p                 : contrast for each object
     exclude_overlap   : if True, points is removed from overlapping regions (True/False)
 
     output:
-    N                 : number of points in each model (before optional exclusion, see N_exclude)
-    rho               : density of points for each model
-    N_exclude         : number of points excluded from each model (due to overlapping regions)
+    N         : number of points in each model (before optional exclusion, see N_exclude)
+    rho       : density of points for each model
+    N_exclude : number of points excluded from each model (due to overlapping regions)
     x_new,y_new,z_new : coordinates of generated points
-    p_new             : contrasts for each point 
-    volume_total      : volume of model (without excluded volume)
+    p_new     : contrasts for each point 
+    volume    : volume of each object
     """
 
     ## Total number of points should not exceed N_points_max (due to memory limitations). This number is system-dependent
-    #N_points_max = 5000        
-    N_points_max = Npoints     
+    N_points_max = 5000        
     
     ## calculate volume and sum of volume (for calculating the number of points in each shape)
     volume = []
@@ -319,7 +317,7 @@ def gen_all_points(Number_of_models,Npoints,x_com,y_com,z_com,model,a,b,c,p,excl
 
     ## generate points
     N,rho,N_exclude = [],[],[]
-    x_new,y_new,z_new,p_new,volume_total = 0,0,0,0,0
+    x_new,y_new,z_new,p_new = 0,0,0,0
     for i in range(Number_of_models):
         if model[i] != 'none': 
             Npoints = int(N_points_max * volume[i]/sum_vol)
@@ -341,16 +339,11 @@ def gen_all_points(Number_of_models,Npoints,x_com,y_com,z_com,model,a,b,c,p,excl
             N.append(N_model)
             rho.append(rho_model)
             N_exclude.append(N_x_sum)
-
-            ## total volume of model (without excluded areas)
-            fraction_left = (N_model-N_x_sum)/N_model
-            volume_total += volume[i]*fraction_left
         else:
             N.append(0)
             rho.append(0.0)
             N_exclude.append(0)
-
-    return N,rho,N_exclude,volume_total,x_new,y_new,z_new,p_new
+    return N,rho,N_exclude,volume,x_new,y_new,z_new,p_new
 
 def append_points(x_new,y_new,z_new,p_new,x_add,y_add,z_add,p_add):
     """
@@ -650,24 +643,16 @@ def calc_A00(q,x_new,y_new,z_new,p_new):
 
 def calc_Pq(q,r,pr):
     """
-    calculate form factor, P(q), and forward scattering, I(0), using pair distribution, p(r) 
+    calculate form factor using histogram
     """
-
-    ## calculate P(q) and I(0) from p(r)
-    I0,Pq = 0,0
+    ## calculate formfactor P(q) from p(r)
+    Pq = 0.0
     for (r_i,pr_i) in zip(r,pr):
-        I0 += pr_i
         qr = q*r_i
         Pq += pr_i*sinc(qr)
- 
-    # normalization, P(0) = 1
-    if I0 == 0:
-        I0 = 1E-5
-    elif I0 < 0:
-        I0 = abs(I0)
-    Pq /= I0
+    Pq /= np.amax(Pq) # normalization
 
-    return I0,Pq
+    return Pq
 
 def decoupling_approx(q,x_new,y_new,z_new,p_new,Pq,S):
     """
@@ -709,7 +694,7 @@ def calc_Iq(q,Pq,S_eff,sigma_r,Model):
     if sigma_r > 0.0:
         roughness = np.exp(-(q*sigma_r)**2/2)
         I *= roughness
-    
+
     ## save intensity to file
     with open('Iq%s.dat' % Model,'w') as f:
         f.write('# %-17s %-17s\n' % ('q','I(q)'))
@@ -718,13 +703,12 @@ def calc_Iq(q,Pq,S_eff,sigma_r,Model):
     
     return I
 
-def simulate_data(q,I,I0,noise,Model):
+def simulate_data(q,I,noise,Model):
     """
     simulate data using calculated scattering and empirical expression for sigma
 
     input
-    q,I    : calculated scattering, normalized
-    I0     : forward scattering
+    q,I    : calculated scattering
     noise  : relative noise (scales the simulated sigmas by a factor)
     Model  : is it Model 1 or Model 2 (see the GUI)
 
@@ -749,7 +733,7 @@ def simulate_data(q,I,I0,noise,Model):
     
     # convert from intensity units to counts
     scale = 100
-    I_sed = scale*I0*I
+    I_sed = I*scale
 
     # make N
     q0 =0.25
@@ -765,20 +749,19 @@ def simulate_data(q,I,I0,noise,Model):
     q_max = np.amax(q)
     q_arb = 0.3
     if q_max < q_arb:
-       I_sed_arb = I_sed[-2]
-    else: 
-        idx_arb = np.where(q>q_arb)[0][0]
-        I_sed_arb = I_sed[idx_arb]
+        q_arb = q_max
+    idx_arb = np.where(q>q_arb)[0][0]
+    I_sed_arb = I_sed[idx_arb]
     
     # calc variance and sigma
     v_sed = (I_sed + 2*c*I_sed_arb/(1-c))/N
     sigma_sed = np.sqrt(v_sed)
 
     # rescale and add relative noise
-    sigma = noise * sigma_sed/scale
+    sigma = noise*sigma_sed/scale
 
     ## simulate data using errors
-    mu = I0*I
+    mu = I
     Isim = np.random.normal(mu,sigma)
 
     ## save to file
@@ -812,34 +795,31 @@ def calc_hr(dist,Nbins,contrast,polydispersity,Model):
     if polydispersity > 0.0:
         Dmax = np.amax(dist) * (1+3*polydispersity)
         r_max = Dmax*ratio_rmax_dmax
-        r,hr_1 = generate_histogram(dist,contrast,r_max,Nbins)
         N_poly_integral = 7
+        r,hr_1 = generate_histogram(dist,contrast,r_max,Nbins)
+        hr = 0.0
         factor_range = 1 + np.linspace(-3,3,N_poly_integral)*polydispersity
-        hr,norm = 0,0
         for factor_d in factor_range:
             if factor_d == 1.0:
                 hr += hr_1
-                norm += 1
             else:
                 dhr = histogram1d(dist*factor_d,bins=Nbins,weights=contrast,range=(0,r_max))
                 res = (1.0-factor_d)/polydispersity
                 w = np.exp(-res**2/2.0) # weight: normal distribution
                 vol = factor_d**3 # weight: relative volume, because larger particles scatter more
                 hr += dhr*w*vol**2
-                norm += w*vol**2
-        hr /= norm
     else:
         Dmax = np.amax(dist)
         r_max = Dmax*ratio_rmax_dmax
         r,hr = generate_histogram(dist,contrast,r_max,Nbins)
     
     ## normalize so hr_max = 1 
-    #hr /= np.amax(hr) 
+    hr /= np.amax(hr) 
     
     ## calculate Rg
-    #Rg = calc_Rg(r,hr)
+    Rg = calc_Rg(r,hr)
 
-    return r,hr,Dmax
+    return r,hr,Dmax,Rg
 
 def calc_pr(dist,Nbins,contrast,polydispersity,Model):
     """
@@ -857,21 +837,15 @@ def calc_pr(dist,Nbins,contrast,polydispersity,Model):
 
     ## calculate pr
     idx_nonzero = np.where(dist>0.0) #  nonzero elements
-    r,pr,Dmax = calc_hr(dist[idx_nonzero],Nbins,contrast[idx_nonzero],polydispersity,Model)
-
-    ## normalize so pr_max = 1
-    pr_norm = pr/np.amax(pr)
-
-    ## calculate Rg
-    Rg = calc_Rg(r,pr_norm)
+    r,pr,Dmax,Rg = calc_hr(dist[idx_nonzero],Nbins,contrast[idx_nonzero],polydispersity,Model)
 
     ## save p(r) to textfile
     with open('pr%s.dat' % Model,'w') as f:
         f.write('# %-17s %-17s\n' % ('r','p(r)'))
         for i in range(Nbins):
-            f.write('  %-17.5e %-17.5e\n' % (r[i],pr_norm[i]))
+            f.write('  %-17.5e %-17.5e\n' % (r[i],pr[i]))
 
-    return r,pr,pr_norm,Dmax,Rg
+    return r,pr,Dmax,Rg
 
 def get_max_dimension(x1,y1,z1,x2,y2,z2):
     """
@@ -978,21 +952,20 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     ax[0].plot(r,pr,color=color,label='p(r), monodisperse')
     ax[0].set_xlabel('r [Angstrom]')
     ax[0].set_ylabel('p(r)')
-    ax[0].set_title('pair distance distribution')
+    ax[0].set_title('pair distance distribution function')
 
     ## plot calculated scattering
     if xscale_log:
         ax[1].set_xscale('log')
     ax[1].set_yscale('log')
     ax[1].set_xlabel('q [1/Angstrom]')
-    ax[1].set_title('normalized scattering, no noise')
+    ax[1].set_ylabel('I(q)')
+    ax[1].set_title('calculated scattering, without noise')
     if S[0] != 1.0 or S[-1] != 1.0:
-        ax[1].set_ylabel('I(q) = P(q)*S(q)')
         ax[1].plot(q,S,color='black',label='S(q)')
         ax[1].plot(q,I,color=color,label='I(q) = P(q)*S(q)')
     else:
-        ax[1].set_ylabel('P(q) = I(q)/I(0)')
-        ax[1].plot(q,I,color=color,label='P(q) = I(q)/I(0)')
+       ax[1].plot(q,I,color=color,label='I(q)')
     ax[1].legend(frameon=False)
 
     ## plot simulated scattering 
@@ -1000,7 +973,7 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
         ax[2].set_xscale('log')
     ax[2].set_yscale('log')
     ax[2].set_xlabel('q [1/Angstrom]')
-    ax[2].set_ylabel('I(q) [a.u.]')
+    ax[2].set_ylabel('I(q)')
     ax[2].set_title('simulated scattering, with noise')
     ax[2].errorbar(q,Isim,yerr=sigma,linestyle='none',marker='.',color='firebrick',label='I(q), simulated',zorder=0)
     ax[2].legend(frameon=False)
@@ -1025,19 +998,15 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
 
     for (r,pr,I,Isim,sigma,S,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],['red','blue'],['firebrick','royalblue'],['-','--'],[1,scale_Isim],[1,2]):
         ax[0].plot(r,pr,linestyle=line,color=col,zorder=zo,label='p(r), Model %d' % model)
-
         if scale > 1: 
             ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d, scaled by %d' % (model,scale),zorder=1/zo)
         else:
             ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d' % model,zorder=zo)
-
         if S[0] != 1.0 or S[-1] != 1.0:
             ax[1].plot(q,S,linestyle=line,color='black',label='S(q), Model %d' % model,zorder=0)
             ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q)=P(q)*S(q), Model %d' % model)
-            ax[1].set_ylabel('I(q)=P(q)*S(q)')
         else:
-            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='P(q) = I(q)/I(0), Model %d' % model)
-            ax[1].set_ylabel('P(q) = I(q)/I(0)')
+            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q), Model %d' % model)
 
     ## figure settings, p(r)
     ax[0].set_xlabel('r [Angstrom]')
@@ -1049,7 +1018,8 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
         ax[1].set_xscale('log')
     ax[1].set_yscale('log')
     ax[1].set_xlabel('q [1/Angstrom]')
-    ax[1].set_title('normalized scattering, no noise')
+    ax[1].set_ylabel('I(q)')
+    ax[1].set_title('calculated scattering, without noise')
     ax[1].legend(frameon=False)
 
     ## figure settings, simulated scattering
@@ -1057,7 +1027,7 @@ def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,
         ax[2].set_xscale('log')
     ax[2].set_yscale('log')
     ax[2].set_xlabel('q [1/Angstrom]')
-    ax[2].set_ylabel('I(q) [a.u.]')
+    ax[2].set_ylabel('I(q)')
     ax[2].set_title('simulated scattering, with noise')
     ax[2].legend(frameon=True)
 
