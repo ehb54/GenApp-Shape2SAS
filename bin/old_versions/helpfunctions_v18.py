@@ -718,21 +718,19 @@ def calc_Iq(q,Pq,S_eff,sigma_r,Model):
     
     return I
 
-#def simulate_data(q,I,I0,noise,Model):
-def simulate_data(q,I,I0,exposure,Model):
+def simulate_data(q,I,I0,noise,Model):
     """
     simulate data using calculated scattering and empirical expression for sigma
 
     input
-    q,I      : calculated scattering, normalized
-    I0       : forward scattering
-    #noise   : relative noise (scales the simulated sigmas by a factor)
-    exposure : exposure (in arbitrary units) - affects the noise level of data
-    Model    : is it Model 1 or Model 2 (see the GUI)
+    q,I    : calculated scattering, normalized
+    I0     : forward scattering
+    noise  : relative noise (scales the simulated sigmas by a factor)
+    Model  : is it Model 1 or Model 2 (see the GUI)
 
     output
-    sigma    : simulated noise
-    Isim     : simulated data
+    sigma  : simulated noise
+    Isim   : simulated data
 
     data is also written to a file
     """
@@ -750,11 +748,11 @@ def simulate_data(q,I,I0,exposure,Model):
     c = 0.85
     
     # convert from intensity units to counts
-    scale = exposure
+    scale = 100
     I_sed = scale*I0*I
 
     # make N
-    q0 = 0.25
+    q0 =0.25
     s = 2/3
     p = 12
     kk = 1/(1-s)/q0**(1+p)
@@ -763,7 +761,7 @@ def simulate_data(q,I,I0,exposure,Model):
     y[idx] =kk*q[idx]
     N = k*y/kk
 
-    # make I(q_arb)
+    #make Iarb
     q_max = np.amax(q)
     q_arb = 0.3
     if q_max < q_arb:
@@ -776,9 +774,8 @@ def simulate_data(q,I,I0,exposure,Model):
     v_sed = (I_sed + 2*c*I_sed_arb/(1-c))/N
     sigma_sed = np.sqrt(v_sed)
 
-    # rescale
-    #sigma = noise * sigma_sed/scale
-    sigma = sigma_sed/scale
+    # rescale and add relative noise
+    sigma = noise * sigma_sed/scale
 
     ## simulate data using errors
     mu = I0*I
@@ -876,6 +873,21 @@ def calc_pr(dist,Nbins,contrast,polydispersity,Model):
 
     return r,pr,pr_norm,Dmax,Rg
 
+
+#def get_max_dimension(x1,y1,z1,x2,y2,z2):
+    """
+    find max dimensions of 2 models 
+    used for determining plot limits
+    """
+"""    
+    max_x = np.amax([np.amax(abs(x1)),np.amax(abs(x2))])
+    max_y = np.amax([np.amax(abs(y1)),np.amax(abs(y2))])
+    max_z = np.amax([np.amax(abs(z1)),np.amax(abs(z2))])
+    max_l = np.amax([max_x,max_y,max_z])
+
+    return max_l
+"""
+
 def get_max_dimension(x_list,y_list,z_list):
     """
     find max dimensions of n models
@@ -884,8 +896,8 @@ def get_max_dimension(x_list,y_list,z_list):
     max_x,max_y,max_z = 0,0,0
     for i in range(len(x_list)):
         tmp_x = np.amax(abs(x_list[i]))
-        tmp_y = np.amax(abs(y_list[i]))
-        tmp_z = np.amax(abs(z_list[i]))
+        tmp_y = np.amax(abs(x_list[i]))
+        tmp_z = np.amax(abs(x_list[i]))
         if tmp_x>max_x:
             max_x = tmp_x
         if tmp_y>max_y:
@@ -893,9 +905,86 @@ def get_max_dimension(x_list,y_list,z_list):
         if tmp_z>max_z:
             max_z = tmp_z
 
+    #max_x = np.amax([np.amax(abs(x1)),np.amax(abs(x2))])
+    #max_y = np.amax([np.amax(abs(y1)),np.amax(abs(y2))])
+    #max_z = np.amax([np.amax(abs(z1)),np.amax(abs(z2))])
     max_l = np.amax([max_x,max_y,max_z])
 
     return max_l
+
+"""
+def plot_2D(x_new,y_new,z_new,p_new,max_dimension,Model):
+   
+    plot 2D-projections of generated points (shapes) using matplotlib:
+    positive contrast in red/blue (Model 1/Model 2)
+    zero contrast in grey
+    negative contrast in green
+    
+    input
+    (x_new,y_new,z_new) : coordinates of simulated points
+    p_new               : excess scattering length density (contrast) of simulated points
+    max_dimension       : max dimension of previous model (for plot limits)
+    Model               : Model number (1 or 2) from GUI
+
+    output
+    plot      : points_<Model>.png
+
+    
+    ## find max dimensions of model
+    max_x = np.amax(abs(x_new))
+    max_y = np.amax(abs(y_new))
+    max_z = np.amax(abs(z_new))
+    max_l = np.amax([max_x,max_y,max_z,max_dimension])*1.1
+    lim = [-max_l,max_l]
+
+    ## find indices of positive, zero and negatative contrast
+    idx_neg = np.where(p_new<0.0)
+    idx_pos = np.where(p_new>0.0)
+    idx_nul = np.where(p_new==0.0)
+    
+    ## figure settings
+    markersize = 0.5
+    if Model == '':
+        color = 'red'
+    elif Model == '_2':
+        color = 'blue'
+
+    f,ax = plt.subplots(1,3,figsize=(12,4))
+    
+    ## plot, perspective 1
+    ax[0].plot(x_new[idx_pos],z_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color=color)
+    ax[0].plot(x_new[idx_neg],z_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
+    ax[0].plot(x_new[idx_nul],z_new[idx_nul],linestyle='none',marker='.',markersize=markersize,color='grey')
+    ax[0].set_xlim(lim)
+    ax[0].set_ylim(lim)
+    ax[0].set_xlabel('x')
+    ax[0].set_ylabel('z')
+    ax[0].set_title('pointmodel, (x,z), "front"')
+
+    ## plot, perspective 2
+    ax[1].plot(y_new[idx_pos],z_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color=color)
+    ax[1].plot(y_new[idx_neg],z_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
+    ax[1].plot(y_new[idx_nul],z_new[idx_nul],linestyle='none',marker='.',markersize=markersize,color='grey')    
+    ax[1].set_xlim(lim)
+    ax[1].set_ylim(lim)
+    ax[1].set_xlabel('y')
+    ax[1].set_ylabel('z')
+    ax[1].set_title('pointmodel, (y,z), "side"')
+
+    ## plot, perspective 3
+    ax[2].plot(x_new[idx_pos],y_new[idx_pos],linestyle='none',marker='.',markersize=markersize,color=color)
+    ax[2].plot(x_new[idx_neg],y_new[idx_neg],linestyle='none',marker='.',markersize=markersize,color='green')
+    ax[2].plot(x_new[idx_nul],y_new[idx_nul],linestyle='none',marker='.',markersize=markersize,color='grey')    
+    ax[2].set_xlim(lim)
+    ax[2].set_ylim(lim)
+    ax[2].set_xlabel('x')
+    ax[2].set_ylabel('y')
+    ax[2].set_title('pointmodel, (x,y), "bottom"')
+    
+    plt.tight_layout()
+    plt.savefig('points%s.png' % Model)
+    plt.close()
+"""
 
 def plot_2D(x_list,y_list,z_list,p_list,colors,Models):
     """
@@ -916,7 +1005,7 @@ def plot_2D(x_list,y_list,z_list,p_list,colors,Models):
 
     ## figure settings
     markersize = 0.5
-    max_l = get_max_dimension(x_list,y_list,z_list)*1.1
+    max_l = get_max_dimension(x_list,y_list,z_list)
     lim = [-max_l,max_l]
 
     for x,y,z,p,color,Model in zip(x_list,y_list,z_list,p_list,colors,Models):
@@ -991,7 +1080,7 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     ax[1].set_title('normalized scattering, no noise')
     if S[0] != 1.0 or S[-1] != 1.0:
         ax[1].set_ylabel(r'$I(q)=P(q)S(q)$')
-        ax[1].plot(q,S,color=color,linestyle='--',label=r'$S(q)$')
+        ax[1].plot(q,S,color='black',label=r'$S(q)$')
         ax[1].plot(q,I,color=color,label=r'$I(q)=P(q)S(q)$')
     else:
         ax[1].set_ylabel(r'$P(q)=I(q)/I(0)$')
@@ -1013,36 +1102,39 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     plt.savefig('plot.png')
     plt.close()
 
+"""
+#def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,xscale_log,scale_Isim):
+def plot_results_combined(q,r1,pr1,I1,Isim1,sigma1,S1,r2,pr2,I2,Isim2,sigma2,S2,xscale_log,scale_Isim,label1,label2):
     
-def plot_results_combined(q,r_list,pr_list,I_list,Isim_list,sigma_list,S_list,labels,colors,colors2,scales,xscale_log):
-    """
-    plot results for n models, using matplotlib:
-    - p(r) 
-    - calculated formfactor, P(r) on log-log and lin-lin scale
-    - simulated noisy data on log-log and lin-lin scale
+#    plot results (combined = Model 1 and Model 2), using matplotlib:
+#    - p(r) 
+#    - calculated formfactor, P(r) on log-log and lin-lin scale
+#    - simulated noisy data on log-log and lin-lin scale
+#
+#    Shape2SAS uses this function if there is 2 Models are opted for in GUI, else plot_results() is used
 
-    Shape2SAS uses this function if more than 1 models is opted for in the GUI, else plot_results() is used
-
-    """
     fig,ax = plt.subplots(1,3,figsize=(12,4))
 
-    zo = 1
-    for (r,pr,I,Isim,sigma,S,model_label,col,col_sim,scale) in zip (r_list,pr_list,I_list,Isim_list,sigma_list,S_list,labels,colors,colors2,scales):
-        ax[0].plot(r,pr,color=col,zorder=zo,label='p(r), %s' % model_label)
+    #for (r,pr,I,Isim,sigma,S,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],['red','blue'],['firebrick','royalblue'],['-','--'],[1,scale_Isim],[1,2]):
+    for (r,pr,I,Isim,sigma,S,model,model_label,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],[label1,label2],['red','blue'],['firebrick','royalblue'],['-','--'],[1,scale_Isim],[1,2]):
+        ax[0].plot(r,pr,linestyle=line,color=col,zorder=zo,label='p(r), %s' % model_label)
 
         if scale > 1: 
+            #ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d, scaled by %d' % (model,scale),zorder=1/zo)
             ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label=r'$I_\mathrm{sim}(q)$, %s, scaled by %d' % (model_label,scale),zorder=1/zo)
         else:
+            #ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d' % model,zorder=zo)
             ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label=r'$I_\mathrm{sim}(q)$, %s' % model_label,zorder=zo)
 
         if S[0] != 1.0 or S[-1] != 1.0:
-            ax[1].plot(q,S,linestyle='--',color=col,label=r'$S(q)$, %s' % model_label,zorder=0)
-            ax[1].plot(q,I,color=col,zorder=zo,label='r$I(q)=P(q)S(q)$, %s' % model_label)
+            ax[1].plot(q,S,linestyle=line,color='black',label=r'$S(q)$, Model %d' % model,zorder=0)
+            #ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q)=P(q)*S(q), Model %d' % model)
+            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='r$I(q)=P(q)S(q)$, %s' % model_label)
             ax[1].set_ylabel(r'$I(q)=P(q)S(q)$')
         else:
-            ax[1].plot(q,I,color=col,zorder=zo,label=r'$P(q)=I(q)/I(0)$, %s' % model_label)
+            #ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='P(q) = I(q)/I(0), Model %d' % model)
+            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label=r'$P(q)=I(q)/I(0)$, %s' % model_label)
             ax[1].set_ylabel(r'$P(q)=I(q)/I(0)$')
-        zo += 1
 
     ## figure settings, p(r)
     ax[0].set_xlabel(r'$r$ [Angstrom]')
@@ -1069,6 +1161,70 @@ def plot_results_combined(q,r_list,pr_list,I_list,Isim_list,sigma_list,S_list,la
 
     ## figure settings
     plt.tight_layout()
+    plt.savefig('plot_combined.png')
+    plt.close()
+"""
+
+    
+def plot_results_combined(q,r_list,pr_list,I_list,Isim_list,sigma_list,S_list,labels,colors,colors2,markers,scales,xscale_log):
+    """
+    plot results for n models, using matplotlib:
+    - p(r) 
+    - calculated formfactor, P(r) on log-log and lin-lin scale
+    - simulated noisy data on log-log and lin-lin scale
+
+    Shape2SAS uses this function if more than 1 models is opted for in the GUI, else plot_results() is used
+
+    """
+    fig,ax = plt.subplots(1,3,figsize=(12,4))
+
+    #for (r,pr,I,Isim,sigma,S,model,col,col_sim,line,scale,zo) in zip ([r1,r2],[pr1,pr2],[I1,I2],[Isim1,Isim2],[sigma1,sigma2],[S1,S2],[1,2],['red','blue'],['firebrick','royalblue'],['-','--'],[1,scale_Isim],[1,2]):
+    for (r,pr,I,Isim,sigma,S,model,model_label,col,col_sim,line,scale,zo) in zip (r_list,pr_list,I_list,Isim_list,sigma_list,S_list,[1,2],labels,colors,colors2,markers,scales,[1,2]):
+        ax[0].plot(r,pr,linestyle=line,color=col,zorder=zo,label='p(r), %s' % model_label)
+
+        if scale > 1: 
+            #ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d, scaled by %d' % (model,scale),zorder=1/zo)
+            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label=r'$I_\mathrm{sim}(q)$, %s, scaled by %d' % (model_label,scale),zorder=1/zo)
+        else:
+            #ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label='Isim(q), Model %d' % model,zorder=zo)
+            ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label=r'$I_\mathrm{sim}(q)$, %s' % model_label,zorder=zo)
+
+        if S[0] != 1.0 or S[-1] != 1.0:
+            ax[1].plot(q,S,linestyle=line,color='black',label=r'$S(q)$, Model %d' % model,zorder=0)
+            #ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='I(q)=P(q)*S(q), Model %d' % model)
+            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='r$I(q)=P(q)S(q)$, %s' % model_label)
+            ax[1].set_ylabel(r'$I(q)=P(q)S(q)$')
+        else:
+            #ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='P(q) = I(q)/I(0), Model %d' % model)
+            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label=r'$P(q)=I(q)/I(0)$, %s' % model_label)
+            ax[1].set_ylabel(r'$P(q)=I(q)/I(0)$')
+
+    ## figure settings, p(r)
+    ax[0].set_xlabel(r'$r$ [Angstrom]')
+    ax[0].set_ylabel(r'$p(r)$')
+    ax[0].set_title('pair distance distribution function')
+    ax[0].legend(frameon=False)
+
+    ## figure settings, calculated scattering
+    if xscale_log:
+        ax[1].set_xscale('log')
+    ax[1].set_yscale('log')
+    ax[1].set_xlabel(r'$q$ [1/Angstrom]')
+    ax[1].set_title('normalized scattering, no noise')
+    ax[1].legend(frameon=False)
+
+    ## figure settings, simulated scattering
+    if xscale_log:
+        ax[2].set_xscale('log')
+    ax[2].set_yscale('log')
+    ax[2].set_xlabel(r'$q$ [1/Angstrom]')
+    ax[2].set_ylabel(r'$I(q)$ [a.u.]')
+    ax[2].set_title('simulated scattering, with noise')
+    ax[2].legend(frameon=True)
+
+    ## figure settings
+    plt.tight_layout()
+    #plt.savefig('plot_combined.png')
     plt.savefig('plot.png')
     plt.close()
 

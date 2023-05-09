@@ -29,14 +29,12 @@ if __name__=='__main__':
     qmin = float(json_variables['qmin'])
     qmax = float(json_variables['qmax'])
     Nq = int(json_variables['qpoints']) # number of points in (simulated) q
-    #noise = float(json_variables['noise'])
-    exposure = float(json_variables['exposure'])
+    noise = float(json_variables['noise'])
     Nbins = int(json_variables['prpoints']) # number of points in p(r)
     Npoints = int(json_variables['Npoints']) # max number of points per model
     
     pds_all,srs_all,labels_all,include,scales_all,exclude_overlaps_all = [0,0,0,0],[0,0,0,0],[],[0,0,0,0],[],[]
-    #Stypes_all,etas_all,R_HSs_all,fracs_all,Reffs_all,Naggrs_all,concs_all = ['None','None','None','None'],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,1]
-    Stypes_all,R_HSs_all,fracs_all,Reffs_all,Naggrs_all,concs_all = ['None','None','None','None'],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0.2,0.2,0.2,0.2]
+    Stypes_all,etas_all,R_HSs_all,fracs_all,Reffs_all,Naggrs_all,concs_all = ['None','None','None','None'],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,1]
     include_sum = 0
     for i in range(4):
         n = i+1
@@ -49,7 +47,7 @@ if __name__=='__main__':
             Stype = json_variables['S_%d' % n]  # type of structure factor 
             Stypes_all[i] = Stype
             if Stype == 'HS':
-                #etas_all[i] = float(json_variables['eta_%d' % n]) # volume fraction
+                etas_all[i] = float(json_variables['eta_%d' % n]) # volume fraction
                 R_HSs_all[i] = float(json_variables['r_hs_%d' % n]) # hard-sphere radius
             if Stype == 'Aggr':
                 fracs_all[i] = float(json_variables['frac_%d' % n]) # fraction of particles in aggregated form
@@ -59,12 +57,11 @@ if __name__=='__main__':
             srs_all[i] = float(json_variables['sigma_r_%d' % n]) # interface roughness
             labels_all.append(json_variables['label_model_%d' % n])
 
-            concs_all[i] = float(json_variables['conc_%d' % n]) # volume fraction (concentration)
+            concs_all.append(json_variables['conc_%d' % n]) # relative concentration
 
         except:
             labels_all.append('Model %d' % n)
-
-        scales_all.append(float(json_variables['scale%d' % n])) # in the plot, scale simulated intensity of Model n
+        scales_all.append(float(json_variables['scale%d' % n])) # scale simulated intensity of Model n
         try:
             dummy = json_variables['exclude_overlap_%d' % n]
             exclude_overlaps_all.append(True)
@@ -100,8 +97,7 @@ if __name__=='__main__':
 
     Max_number_of_subunits = 8
     count_subunits = [0,0,0,0]
-    #Models,pds,Stypes,etas,R_HSs,srs,fracs,Naggrs,Reffs,labels,colors,colors2,scales,concs,excludes = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
-    Models,pds,Stypes,R_HSs,srs,fracs,Naggrs,Reffs,labels,colors,colors2,scales,concs,excludes = [],[],[],[],[],[],[],[],[],[],[],[],[],[]
+    Models,pds,Stypes,etas,R_HSs,srs,fracs,Naggrs,Reffs,labels,colors,colors2,scales,concs,excludes = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
     for j in range(4):
         if include[j]:
             for i in range(Max_number_of_subunits):
@@ -113,7 +109,7 @@ if __name__=='__main__':
                 Models.append(Models_all[j])
                 pds.append(pds_all[j])
                 Stypes.append(Stypes_all[j])
-                #etas.append(etas_all[j])
+                etas.append(etas_all[j])
                 R_HSs.append(R_HSs_all[j])
                 srs.append(srs_all[j])
                 fracs.append(fracs_all[j])
@@ -129,8 +125,7 @@ if __name__=='__main__':
             count_subunits[j] = 0
 
     r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,x_list,y_list,z_list,p_list = [],[],[],[],[],[],[],[],[],[]
-    #for (Model,polydispersity,Stype,eta,R_HS,frac,Naggr,Reff,sigma_r,label,exclude_overlap,conc) in zip(Models,pds,Stypes,etas,R_HSs,fracs,Naggrs,Reffs,srs,labels,excludes,concs):
-    for (Model,polydispersity,Stype,R_HS,frac,Naggr,Reff,sigma_r,label,exclude_overlap,conc) in zip(Models,pds,Stypes,R_HSs,fracs,Naggrs,Reffs,srs,labels,excludes,concs):
+    for (Model,polydispersity,Stype,eta,R_HS,frac,Naggr,Reff,sigma_r,label,exclude_overlap,conc) in zip(Models,pds,Stypes,etas,R_HSs,fracs,Naggrs,Reffs,srs,labels,excludes,concs):
        
         ## print model to stdout
         if Model == '':
@@ -271,27 +266,29 @@ if __name__=='__main__':
         ## timing
         start_Iq = time.time()
         message.udpmessage({"_textarea":"\n# Calculating intensity, I(q)...\n"})
-        message.udpmessage({"_textarea":"    volume fraction :  %1.2f\n" % conc})
+        if eta > 0:
+            message.udpmessage({"_textarea":"    eta               = %1.2f\n" % eta})
+            message.udpmessage({"_textarea":"    R_HS              = %1.2f\n" % R_HS})
+        if frac > 0:
+            message.udpmessage({"_textarea":"    frac              = %1.2f\n" % frac})
+            message.udpmessage({"_textarea":"    Reff              = %1.2f\n" % Reff})
+            message.udpmessage({"_textarea":"    Naggr             = %1.2f\n" % Naggr})
         if sigma_r > 0:
-            message.udpmessage({"_textarea":"    sigma_r :  %1.2f\n" % sigma_r})
+            message.udpmessage({"_textarea":"    sigma_r           = %1.2f\n" % sigma_r})
 
         ## calculate forward scattering and form factor
         I0,Pq = calc_Pq(q,r,pr)
         
-        I0 *= conc*volume_total*1E-4 # make I0 scale with volume fraction (concentration) and volume squared and scale so default values gives I(0) of approx unity
-        message.udpmessage({"_textarea":"    I(0) :  %1.2e\n" % I0}) 
+        I0 *= conc*(volume_total)**2*1E-12 # make I0 scale with concentration and volume squared and scale to realistic numbers
+        message.udpmessage({"_textarea":"    I(0): %1.2e\n" % I0}) 
 
         ## calculate structure factor
         if Stype == 'HS':
             # hard sphere structure factor
-            S = calc_S_HS(q,conc,R_HS)
-            message.udpmessage({"_textarea":"    hard-sphere radius :  %1.2f\n" % R_HS})
+            S = calc_S_HS(q,eta,R_HS)
         elif Stype == 'Aggr':
             # aggregate structure factor: fractal aggregate with dimensionality 2
             S = calc_S_aggr(q,Reff,Naggr)
-            message.udpmessage({"_textarea":"    fraction of aggregates :  %1.2f\n" % frac})
-            message.udpmessage({"_textarea":"    effective radius of aggregates :  %1.2f\n" % Reff})
-            message.udpmessage({"_textarea":"    particles per aggregate :  %1.2f\n" % Naggr})
         else:
             S = np.ones(len(q))
         # decoupling approx
@@ -305,12 +302,11 @@ if __name__=='__main__':
         I = calc_Iq(q,Pq,S_eff,sigma_r,Model)
          
         ## simulate data
-        #Isim,sigma = simulate_data(q,I,I0,noise,Model)
-        Isim,sigma = simulate_data(q,I,I0,exposure,Model)
+        Isim,sigma = simulate_data(q,I,I0,noise,Model)
 
         ## timing
         time_Iq = time.time() - start_Iq
-        message.udpmessage({"_textarea":"    time I(q) :  %1.2f sec\n" % time_Iq})
+        message.udpmessage({"_textarea":"    time I(q): %1.2f sec\n" % time_Iq})
         
         ################### OUTPUT to GUI #####################################
 

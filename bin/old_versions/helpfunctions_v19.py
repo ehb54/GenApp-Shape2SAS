@@ -718,21 +718,19 @@ def calc_Iq(q,Pq,S_eff,sigma_r,Model):
     
     return I
 
-#def simulate_data(q,I,I0,noise,Model):
-def simulate_data(q,I,I0,exposure,Model):
+def simulate_data(q,I,I0,noise,Model):
     """
     simulate data using calculated scattering and empirical expression for sigma
 
     input
-    q,I      : calculated scattering, normalized
-    I0       : forward scattering
-    #noise   : relative noise (scales the simulated sigmas by a factor)
-    exposure : exposure (in arbitrary units) - affects the noise level of data
-    Model    : is it Model 1 or Model 2 (see the GUI)
+    q,I    : calculated scattering, normalized
+    I0     : forward scattering
+    noise  : relative noise (scales the simulated sigmas by a factor)
+    Model  : is it Model 1 or Model 2 (see the GUI)
 
     output
-    sigma    : simulated noise
-    Isim     : simulated data
+    sigma  : simulated noise
+    Isim   : simulated data
 
     data is also written to a file
     """
@@ -750,11 +748,11 @@ def simulate_data(q,I,I0,exposure,Model):
     c = 0.85
     
     # convert from intensity units to counts
-    scale = exposure
+    scale = 100
     I_sed = scale*I0*I
 
     # make N
-    q0 = 0.25
+    q0 =0.25
     s = 2/3
     p = 12
     kk = 1/(1-s)/q0**(1+p)
@@ -763,7 +761,7 @@ def simulate_data(q,I,I0,exposure,Model):
     y[idx] =kk*q[idx]
     N = k*y/kk
 
-    # make I(q_arb)
+    #make Iarb
     q_max = np.amax(q)
     q_arb = 0.3
     if q_max < q_arb:
@@ -776,9 +774,8 @@ def simulate_data(q,I,I0,exposure,Model):
     v_sed = (I_sed + 2*c*I_sed_arb/(1-c))/N
     sigma_sed = np.sqrt(v_sed)
 
-    # rescale
-    #sigma = noise * sigma_sed/scale
-    sigma = sigma_sed/scale
+    # rescale and add relative noise
+    sigma = noise * sigma_sed/scale
 
     ## simulate data using errors
     mu = I0*I
@@ -876,6 +873,21 @@ def calc_pr(dist,Nbins,contrast,polydispersity,Model):
 
     return r,pr,pr_norm,Dmax,Rg
 
+
+#def get_max_dimension(x1,y1,z1,x2,y2,z2):
+    """
+    find max dimensions of 2 models 
+    used for determining plot limits
+    """
+"""    
+    max_x = np.amax([np.amax(abs(x1)),np.amax(abs(x2))])
+    max_y = np.amax([np.amax(abs(y1)),np.amax(abs(y2))])
+    max_z = np.amax([np.amax(abs(z1)),np.amax(abs(z2))])
+    max_l = np.amax([max_x,max_y,max_z])
+
+    return max_l
+"""
+
 def get_max_dimension(x_list,y_list,z_list):
     """
     find max dimensions of n models
@@ -893,6 +905,9 @@ def get_max_dimension(x_list,y_list,z_list):
         if tmp_z>max_z:
             max_z = tmp_z
 
+    #max_x = np.amax([np.amax(abs(x1)),np.amax(abs(x2))])
+    #max_y = np.amax([np.amax(abs(y1)),np.amax(abs(y2))])
+    #max_z = np.amax([np.amax(abs(z1)),np.amax(abs(z2))])
     max_l = np.amax([max_x,max_y,max_z])
 
     return max_l
@@ -1014,7 +1029,7 @@ def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
     plt.close()
 
     
-def plot_results_combined(q,r_list,pr_list,I_list,Isim_list,sigma_list,S_list,labels,colors,colors2,scales,xscale_log):
+def plot_results_combined(q,r_list,pr_list,I_list,Isim_list,sigma_list,S_list,labels,colors,colors2,markers,scales,xscale_log):
     """
     plot results for n models, using matplotlib:
     - p(r) 
@@ -1027,8 +1042,8 @@ def plot_results_combined(q,r_list,pr_list,I_list,Isim_list,sigma_list,S_list,la
     fig,ax = plt.subplots(1,3,figsize=(12,4))
 
     zo = 1
-    for (r,pr,I,Isim,sigma,S,model_label,col,col_sim,scale) in zip (r_list,pr_list,I_list,Isim_list,sigma_list,S_list,labels,colors,colors2,scales):
-        ax[0].plot(r,pr,color=col,zorder=zo,label='p(r), %s' % model_label)
+    for (r,pr,I,Isim,sigma,S,model_label,col,col_sim,line,scale) in zip (r_list,pr_list,I_list,Isim_list,sigma_list,S_list,labels,colors,colors2,markers,scales):
+        ax[0].plot(r,pr,linestyle=line,color=col,zorder=zo,label='p(r), %s' % model_label)
 
         if scale > 1: 
             ax[2].errorbar(q,Isim*scale,yerr=sigma*scale,linestyle='none',marker='.',color=col_sim,label=r'$I_\mathrm{sim}(q)$, %s, scaled by %d' % (model_label,scale),zorder=1/zo)
@@ -1037,10 +1052,10 @@ def plot_results_combined(q,r_list,pr_list,I_list,Isim_list,sigma_list,S_list,la
 
         if S[0] != 1.0 or S[-1] != 1.0:
             ax[1].plot(q,S,linestyle='--',color=col,label=r'$S(q)$, %s' % model_label,zorder=0)
-            ax[1].plot(q,I,color=col,zorder=zo,label='r$I(q)=P(q)S(q)$, %s' % model_label)
+            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label='r$I(q)=P(q)S(q)$, %s' % model_label)
             ax[1].set_ylabel(r'$I(q)=P(q)S(q)$')
         else:
-            ax[1].plot(q,I,color=col,zorder=zo,label=r'$P(q)=I(q)/I(0)$, %s' % model_label)
+            ax[1].plot(q,I,linestyle=line,color=col,zorder=zo,label=r'$P(q)=I(q)/I(0)$, %s' % model_label)
             ax[1].set_ylabel(r'$P(q)=I(q)/I(0)$')
         zo += 1
 

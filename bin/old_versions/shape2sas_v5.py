@@ -29,64 +29,122 @@ if __name__=='__main__':
     qmin = float(json_variables['qmin'])
     qmax = float(json_variables['qmax'])
     Nq = int(json_variables['qpoints']) # number of points in (simulated) q
-    #noise = float(json_variables['noise'])
-    exposure = float(json_variables['exposure'])
+    noise = float(json_variables['noise'])
     Nbins = int(json_variables['prpoints']) # number of points in p(r)
     Npoints = int(json_variables['Npoints']) # max number of points per model
     
-    pds_all,srs_all,labels_all,include,scales_all,exclude_overlaps_all = [0,0,0,0],[0,0,0,0],[],[0,0,0,0],[],[]
-    #Stypes_all,etas_all,R_HSs_all,fracs_all,Reffs_all,Naggrs_all,concs_all = ['None','None','None','None'],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[1,1,1,1]
-    Stypes_all,R_HSs_all,fracs_all,Reffs_all,Naggrs_all,concs_all = ['None','None','None','None'],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0,0,0,0],[0.2,0.2,0.2,0.2]
-    include_sum = 0
-    for i in range(4):
-        n = i+1
-        try:
-            dummy = json_variables['include_model_%d' % n]
-            include [i] = 1
-            include_sum += 1 
-            pds_all[i] = float(json_variables['polydispersity_%d' % n])
-            
-            Stype = json_variables['S_%d' % n]  # type of structure factor 
-            Stypes_all[i] = Stype
-            if Stype == 'HS':
-                #etas_all[i] = float(json_variables['eta_%d' % n]) # volume fraction
-                R_HSs_all[i] = float(json_variables['r_hs_%d' % n]) # hard-sphere radius
-            if Stype == 'Aggr':
-                fracs_all[i] = float(json_variables['frac_%d' % n]) # fraction of particles in aggregated form
-                Reffs_all[i] = float(json_variables['R_eff_%d' % n]) # effective radius per particle in aggregate
-                Naggrs_all[i] = float(json_variables['N_aggr_%d' % n]) # number of particles per aggregate
+    try:
+        dummy = json_variables['include_model_1']
+        pd1 = float(json_variables['polydispersity'])
+        Stype1 = json_variables['S'] # type of structure factore 
+        sr1 = float(json_variables['sigma_r']) # interface roughness
+        label1 = json_variables['label_model']
+        include1 = 1
+    except:
+        pd1 = 0.0
+        Stype1 = 'None'
+        sr1 = 0.0
+        label1 = 'Model 1'
+        include1 = 0
+    try:
+        dummy = json_variables['include_model_2']
+        pd2 = float(json_variables['polydispersity_2'])
+        Stype2 = json_variables['S_2'] # type of structure factore 
+        sr2 = float(json_variables['sigma_r_2']) # interface roughness
+        label2 = json_variables['label_model_2']
+        include2 = 1 
+    except:
+        pd2 = 0.0
+        Stype2 = 'None'
+        sr2 = 0.0
+        label2 = 'Model 2'
+        include2 = 0
+    try:
+        dummy = json_variables['include_model_3']
+        pd3 = float(json_variables['polydispersity_3'])
+        Stype3 = json_variables['S_3'] # type of structure factore 
+        sr3 = float(json_variables['sigma_r_3']) # interface roughness
+        label3 = json_variables['label_model_3']
+        include3 = 1
+    except:
+        pd3 = 0.0
+        Stype3 = 'None'
+        sr3 = 0.0
+        label3 = 'Model 3'
+        include3 = 0
 
-            srs_all[i] = float(json_variables['sigma_r_%d' % n]) # interface roughness
-            labels_all.append(json_variables['label_model_%d' % n])
+    folder = json_variables['_base_directory'] # output folder dir
 
-            concs_all[i] = float(json_variables['conc_%d' % n]) # volume fraction (concentration)
+    ## read checkboxes and related input
+    # the Json input for checkboxes only exists if boxes are checked
+    # therefore, I use try-except to import
+    try:
+        dummy = json_variables['exclude_overlap']
+        exclude_overlap = True
+    except:
+        exclude_overlap = False
+    try:
+        dummy = json_variables['exclude_overlap_2']
+        exclude_overlap_2 = True
+    except:
+        exclude_overlap_2 = False
+    try:
+        dummy = json_variables['exclude_overlap_3']
+        exclude_overlap_3 = True
+    except:
+        exclude_overlap_3 = False
 
-        except:
-            labels_all.append('Model %d' % n)
-
-        scales_all.append(float(json_variables['scale%d' % n])) # in the plot, scale simulated intensity of Model n
-        try:
-            dummy = json_variables['exclude_overlap_%d' % n]
-            exclude_overlaps_all.append(True)
-        except:
-            exclude_overlaps_all.append(False)
-
-    # plot options
     try:
         dummy = json_variables['xscale_lin']
         xscale_log = False
     except:
         xscale_log = True
-    
-    ## output folder
-    folder = json_variables['_base_directory'] # output folder dir
 
+    if Stype1 == 'HS':
+        eta1 = float(json_variables['eta']) # volume fraction
+        R_HS1 = float(json_variables['r_hs']) # hard-sphere radius
+    else:
+        eta1,R_HS1 = 0,0
+    if Stype1 == 'Aggr':
+        frac1 = float(json_variables['frac']) # fraction of particles in aggregated form
+        Reff1 = float(json_variables['R_eff']) # effective radius per particle in aggregate
+        Naggr1 = float(json_variables['N_aggr']) # number of particles per aggregate
+    else:
+        frac1,Reff1,Naggr1 = 0,0,0
+    if Stype2 == 'HS':
+        eta2 = float(json_variables['eta_2']) # volume fraction
+        R_HS2 = float(json_variables['r_hs_2']) # hard-sphere radius
+    else:
+        eta2,R_HS2 = 0,0
+    if Stype2 == 'Aggr':
+        frac2 = float(json_variables['frac_2']) # fraction of particles in aggregated form
+        Reff2 = float(json_variables['R_eff_2']) # effective radius per particle in aggregate
+        Naggr2 = float(json_variables['N_aggr_2']) # number of particles per aggregate
+    else:
+        frac2,Reff2,Naggr2 = 0,0,0
+    if Stype3 == 'HS':
+        eta3 = float(json_variables['eta_3']) # volume fraction
+        R_HS3 = float(json_variables['r_hs_3']) # hard-sphere radius
+    else:
+        eta3,R_HS3 = 0,0
+    if Stype3 == 'Aggr':
+        frac3 = float(json_variables['frac_3']) # fraction of particles in aggregated form
+        Reff3 = float(json_variables['R_eff_3']) # effective radius per particle in aggregate
+        Naggr3 = float(json_variables['N_aggr_3']) # number of particles per aggregate
+    else:
+        frac3,Reff3,Naggr3 = 0,0,0
+
+    scale1 = float(json_variables['scale1']) # scale simulated intensity of Model 1
+    scale2 = float(json_variables['scale2']) # scale simulated intensity of Model 2
+    scale3 = float(json_variables['scale3']) # scale simulated intensity of Model 3
+    
     ## setup  messaging in GUI
     message = genapp(json_variables)    
     output = {} # create an empty python dictionary
 
     ## check input
-    if include_sum == 0:
+    sum_include = include1+include2+include3
+    if sum_include == 0:
         message.udpmessage({"_textarea":"\n############################################################\n" })
         message.udpmessage({"_textarea":"##########   You need to include at least 1 model ##########\n" })
         message.udpmessage({"_textarea":"############################################################\n" })
@@ -94,16 +152,29 @@ if __name__=='__main__':
 
     ## generate q vector
     q = generate_q(qmin,qmax,Nq)
-    Models_all = ['','_2','_3','_4']
-    colors_all = ['red','blue','orange','forestgreen']
-    colors2_all= ['firebrick','royalblue','darkorange','darkgreen']
+    
+    Models_all = ['','_2','_3']
+    pds_all    = [pd1,pd2,pd3]
+    Stypes_all = [Stype1,Stype2,Stype3]
+    etas_all   = [eta1,eta2,eta3]
+    R_HSs_all  = [R_HS1,R_HS2,R_HS3]
+    srs_all    = [sr1,sr2,sr3]
+    fracs_all  = [frac1,frac2,frac3]
+    Naggrs_all = [Naggr1,Naggr2,Naggr3]
+    Reffs_all  = [Reff1,Reff2,Reff3]
+    labels_all = [label1,label2,label3]
+    includes   = [include1,include2,include3]
+    colors_all = ['red','blue','orange']
+    colors2_all= ['firebrick','royalblue','darkorange']
+    lines_all  = ['-','-','-']
+    scales_all = [scale1,scale2,scale3]
 
+    ## check if Model 2 is included
     Max_number_of_subunits = 8
-    count_subunits = [0,0,0,0]
-    #Models,pds,Stypes,etas,R_HSs,srs,fracs,Naggrs,Reffs,labels,colors,colors2,scales,concs,excludes = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
-    Models,pds,Stypes,R_HSs,srs,fracs,Naggrs,Reffs,labels,colors,colors2,scales,concs,excludes = [],[],[],[],[],[],[],[],[],[],[],[],[],[]
-    for j in range(4):
-        if include[j]:
+    count_subunits = [0,0,0]
+    Models,pds,Stypes,etas,R_HSs,srs,fracs,Naggrs,Reffs,labels,colors,colors2,lines,scales = [],[],[],[],[],[],[],[],[],[],[],[],[],[]
+    for j in range(len(includes)):
+        if includes[j]:
             for i in range(Max_number_of_subunits):
                 model_name = 'model%d_%d' % (i+1,j+1)
                 model = json_variables[model_name]
@@ -113,7 +184,7 @@ if __name__=='__main__':
                 Models.append(Models_all[j])
                 pds.append(pds_all[j])
                 Stypes.append(Stypes_all[j])
-                #etas.append(etas_all[j])
+                etas.append(etas_all[j])
                 R_HSs.append(R_HSs_all[j])
                 srs.append(srs_all[j])
                 fracs.append(fracs_all[j])
@@ -122,15 +193,13 @@ if __name__=='__main__':
                 labels.append(labels_all[j])
                 colors.append(colors_all[j])
                 colors2.append(colors2_all[j])
+                lines.append(lines_all[j])
                 scales.append(scales_all[j])
-                concs.append(concs_all[j])
-                excludes.append(exclude_overlaps_all[j])
         else:
             count_subunits[j] = 0
 
     r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,x_list,y_list,z_list,p_list = [],[],[],[],[],[],[],[],[],[]
-    #for (Model,polydispersity,Stype,eta,R_HS,frac,Naggr,Reff,sigma_r,label,exclude_overlap,conc) in zip(Models,pds,Stypes,etas,R_HSs,fracs,Naggrs,Reffs,srs,labels,excludes,concs):
-    for (Model,polydispersity,Stype,R_HS,frac,Naggr,Reff,sigma_r,label,exclude_overlap,conc) in zip(Models,pds,Stypes,R_HSs,fracs,Naggrs,Reffs,srs,labels,excludes,concs):
+    for (Model,polydispersity,Stype,eta,R_HS,frac,Naggr,Reff,sigma_r,label) in zip(Models,pds,Stypes,etas,R_HSs,fracs,Naggrs,Reffs,srs,labels):
        
         ## print model to stdout
         if Model == '':
@@ -139,8 +208,6 @@ if __name__=='__main__':
             model_number = 2
         elif Model == '_3':
             model_number = 3
-        elif Model == '_4':
-            model_number = 4
         message.udpmessage({"_textarea":"\n#####################################################\n" })
         message.udpmessage({"_textarea":"##########   MODEL: %s   ##########################\n" % label })
         message.udpmessage({"_textarea":"#####################################################\n" })
@@ -271,32 +338,34 @@ if __name__=='__main__':
         ## timing
         start_Iq = time.time()
         message.udpmessage({"_textarea":"\n# Calculating intensity, I(q)...\n"})
-        message.udpmessage({"_textarea":"    volume fraction :  %1.2f\n" % conc})
+        if eta > 0:
+            message.udpmessage({"_textarea":"    eta               = %1.2f\n" % eta})
+            message.udpmessage({"_textarea":"    R_HS              = %1.2f\n" % R_HS})
+        if frac > 0:
+            message.udpmessage({"_textarea":"    frac              = %1.2f\n" % frac})
+            message.udpmessage({"_textarea":"    Reff              = %1.2f\n" % Reff})
+            message.udpmessage({"_textarea":"    Naggr             = %1.2f\n" % Naggr})
         if sigma_r > 0:
-            message.udpmessage({"_textarea":"    sigma_r :  %1.2f\n" % sigma_r})
+            message.udpmessage({"_textarea":"    sigma_r           = %1.2f\n" % sigma_r})
 
         ## calculate forward scattering and form factor
         I0,Pq = calc_Pq(q,r,pr)
         
-        I0 *= conc*volume_total*1E-4 # make I0 scale with volume fraction (concentration) and volume squared and scale so default values gives I(0) of approx unity
-        message.udpmessage({"_textarea":"    I(0) :  %1.2e\n" % I0}) 
+        I0 *= (volume_total)**2*1E-12 # make I0 scale with volume squared and scale to realistic numbers
+        message.udpmessage({"_textarea":"    I(0): %1.2e\n" % I0}) 
 
         ## calculate structure factor
         if Stype == 'HS':
             # hard sphere structure factor
-            S = calc_S_HS(q,conc,R_HS)
-            message.udpmessage({"_textarea":"    hard-sphere radius :  %1.2f\n" % R_HS})
+            S = calc_S_HS(q,eta,R_HS)
         elif Stype == 'Aggr':
             # aggregate structure factor: fractal aggregate with dimensionality 2
             S = calc_S_aggr(q,Reff,Naggr)
-            message.udpmessage({"_textarea":"    fraction of aggregates :  %1.2f\n" % frac})
-            message.udpmessage({"_textarea":"    effective radius of aggregates :  %1.2f\n" % Reff})
-            message.udpmessage({"_textarea":"    particles per aggregate :  %1.2f\n" % Naggr})
         else:
             S = np.ones(len(q))
         # decoupling approx
         S_eff = decoupling_approx(q,x_new,y_new,z_new,p_new,Pq,S)
-
+        #S_eff = S
         # fraction of aggregates
         if Stype == 'Aggr':
             S_eff = (1-frac) + frac*S_eff
@@ -305,12 +374,11 @@ if __name__=='__main__':
         I = calc_Iq(q,Pq,S_eff,sigma_r,Model)
          
         ## simulate data
-        #Isim,sigma = simulate_data(q,I,I0,noise,Model)
-        Isim,sigma = simulate_data(q,I,I0,exposure,Model)
+        Isim,sigma = simulate_data(q,I,I0,noise,Model)
 
         ## timing
         time_Iq = time.time() - start_Iq
-        message.udpmessage({"_textarea":"    time I(q) :  %1.2f sec\n" % time_Iq})
+        message.udpmessage({"_textarea":"    time I(q): %1.2f sec\n" % time_Iq})
         
         ################### OUTPUT to GUI #####################################
 
@@ -321,6 +389,7 @@ if __name__=='__main__':
         output["Dmax%s" % Model] = "%1.2f" % Dmax
         output["Rg%s" % Model] = "%1.2f" % Rg
         output["pdb_jmol%s" % Model] = "%s/model%s.pdb" % (folder,Model)
+        #output["pdbshow"] = folder + "/" + "model.pdb"
 
         ## save variables for combined plots
         r_list.append(r)
@@ -333,6 +402,11 @@ if __name__=='__main__':
         y_list.append(y_new)
         z_list.append(z_new)
         p_list.append(p_new)
+        #if Model == '':
+        #    r1,pr_norm1,I1,Isim1,sigma1,S_eff1 = r,pr_norm,I,Isim,sigma,S_eff
+        #    x1,y1,z1,p1 = x_new,y_new,z_new,p_new
+        #    if count_subunits[1] >= 1:
+        #        # delete unnecessary data (reduce memory usage)
         del x_new,y_new,z_new,p_new
 
     ################### GENERATING PLOTS  #####################################
@@ -348,11 +422,25 @@ if __name__=='__main__':
     message.udpmessage({"_textarea":"\n# Making plots of p(r) and I(q)...\n"})
     
     ## plot 2D projections
+    #if count_subunits[1] >= 1:
+        #max_dimension = get_max_dimension(x1,y1,z1,x_new,y_new,z_new)
+        #for (x,y,z,p,Model) in zip([x1,x_new],[y1,y_new],[z1,z_new],[p1,p_new],Models):
+        #for (x,y,z,p,Model) in zip(x_list,y_list,z_list,p_list,Models):
+        #    plot_2D(x,y,z,p,max_dimension,Model)
+    #else:
+    #    plot_2D(x_new,y_new,z_new,p_new,0,Model)
     plot_2D(x_list,y_list,z_list,p_list,colors,Models)
 
     ## plot p(r) and I(q)
-    plot_results_combined(q,r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,labels,colors,colors2,scales,xscale_log)
+    plot_results_combined(q,r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,labels,colors,colors2,lines,scales,xscale_log)
     output["fig"] = "%s/plot.png" % folder
+    #if len(colors) > 1:
+        #plot_results_combined(q,r1,pr_norm1,I1,Isim1,sigma1,S_eff1,r,pr_norm,I,Isim,sigma,S_eff,xscale_log,scale_Isim,label1,label2)
+        #plot_results_combined(q,r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,labels,colors,colors2,markers,xscale_log,scale_Isim)
+        #output["fig"] = "%s/plot_combined.png" % folder
+    #else:
+        #plot_results(q,r_list[0],pr_norm_list[0],I_list[0],Isim_list[0],sigma_list[0],S_eff_list[0],xscale_log)
+        #output["fig"] = "%s/plot.png" % folder
     
     ## compress (zip) results for output
     for Model in Models:
