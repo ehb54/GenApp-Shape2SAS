@@ -1,0 +1,13 @@
+button {
+    font-size: 1em;
+    padding : 0.4em;
+    margin-right: 7em; 
+}
+
+.gabuttonsubmit {
+    background : #b3ffcc;
+}
+
+.gabuttonreset {
+    background : #FF4444;
+}

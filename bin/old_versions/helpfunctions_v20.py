@@ -321,29 +321,34 @@ def gen_all_points(Number_of_subunits,Npoints,x_com,y_com,z_com,subunit,a,b,c,p,
     N,rho,N_exclude = [],[],[]
     x_new,y_new,z_new,p_new,volume_total = 0,0,0,0,0
     for i in range(Number_of_subunits):
-        Npoints = int(N_points_max * volume[i]/sum_vol)
+        if 1: 
+            Npoints = int(N_points_max * volume[i]/sum_vol)
             
-        ## generate points
-        x_add,y_add,z_add,p_add,N_subunit,rho_subunit = gen_points(x_com[i],y_com[i],z_com[i],subunit[i],a[i],b[i],c[i],p[i],Npoints)
+            ## generate points
+            x_add,y_add,z_add,p_add,N_subunit,rho_subunit = gen_points(x_com[i],y_com[i],z_com[i],subunit[i],a[i],b[i],c[i],p[i],Npoints)
 
-        ## exclude overlap region (optional)
-        N_x_sum = 0
-        if exclude_overlap:
-            for j in range(i):
-                x_add,y_add,z_add,p_add,N_x = check_overlap(x_add,y_add,z_add,p_add,x_com[j],y_com[j],z_com[j],subunit[j],a[j],b[j],c[j])
-                N_x_sum += N_x
+            ## exclude overlap region (optional)
+            N_x_sum = 0
+            if exclude_overlap:
+                for j in range(i):
+                    x_add,y_add,z_add,p_add,N_x = check_overlap(x_add,y_add,z_add,p_add,x_com[j],y_com[j],z_com[j],subunit[j],a[j],b[j],c[j])
+                    N_x_sum += N_x
             
-        ## append points to vector
-        x_new,y_new,z_new,p_new = append_points(x_new,y_new,z_new,p_new,x_add,y_add,z_add,p_add)
+            ## append points to vector
+            x_new,y_new,z_new,p_new = append_points(x_new,y_new,z_new,p_new,x_add,y_add,z_add,p_add)
 
-        ## append to lists
-        N.append(N_subunit)
-        rho.append(rho_subunit)
-        N_exclude.append(N_x_sum)
+            ## append to lists
+            N.append(N_subunit)
+            rho.append(rho_subunit)
+            N_exclude.append(N_x_sum)
 
-        ## total volume of model (without excluded areas)
-        fraction_left = (N_subunit-N_x_sum)/N_subunit
-        volume_total += volume[i]*fraction_left
+            ## total volume of model (without excluded areas)
+            fraction_left = (N_subunit-N_x_sum)/N_subunit
+            volume_total += volume[i]*fraction_left
+        else:
+            N.append(0)
+            rho.append(0.0)
+            N_exclude.append(0)
 
     return N,rho,N_exclude,volume_total,x_new,y_new,z_new,p_new
 
@@ -952,7 +957,57 @@ def plot_2D(x_list,y_list,z_list,p_list,colors,Models):
         plt.savefig('points%s.png' % Model)
         plt.close()
 
-def plot_results(q,r_list,pr_list,I_list,Isim_list,sigma_list,S_list,names,colors,colors2,scales,xscale_log):
+def plot_results(q,r,pr,I,Isim,sigma,S,xscale_log):
+    """
+    plot results using matplotlib:
+    - p(r) 
+    - calculated scattering
+    - simulated data with noise
+
+    """
+   
+    ## plot settings
+    fig,ax = plt.subplots(1,3,figsize=(12,4))
+    color = 'red'
+
+    ## plot p(r)
+    ax[0].plot(r,pr,color=color,label='p(r), monodisperse')
+    ax[0].set_xlabel(r'$r$ [$\mathrm{\AA}$]')
+    ax[0].set_ylabel(r'$p(r)$')
+    ax[0].set_title('pair distance distribution')
+
+    ## plot calculated scattering
+    if xscale_log:
+        ax[1].set_xscale('log')
+    ax[1].set_yscale('log')
+    ax[1].set_xlabel(r'$q$ [$\mathrm{\AA}^{-1}$]')
+    ax[1].set_title('normalized scattering, no noise')
+    if S[0] != 1.0 or S[-1] != 1.0:
+        ax[1].set_ylabel(r'$I(q)=P(q)S(q)$')
+        ax[1].plot(q,S,color=color,linestyle='--',label=r'$S(q)$')
+        ax[1].plot(q,I,color=color,label=r'$I(q)=P(q)S(q)$')
+    else:
+        ax[1].set_ylabel(r'$P(q)=I(q)/I(0)$')
+        ax[1].plot(q,I,color=color,label=r'$P(q)=I(q)/I(0)$')
+    ax[1].legend(frameon=False)
+
+    ## plot simulated scattering 
+    if xscale_log:
+        ax[2].set_xscale('log')
+    ax[2].set_yscale('log')
+    ax[2].set_xlabel(r'$q$ [$\mathrm{\AA}$]')
+    ax[2].set_ylabel(r'$I(q)$ [a.u.]')
+    ax[2].set_title('simulated scattering, with noise')
+    ax[2].errorbar(q,Isim,yerr=sigma,linestyle='none',marker='.',color='firebrick',label=r'$I(q)$, simulated',zorder=0)
+    ax[2].legend(frameon=False)
+
+    ## figure settings
+    plt.tight_layout()
+    plt.savefig('plot.png')
+    plt.close()
+
+    
+def plot_results_combined(q,r_list,pr_list,I_list,Isim_list,sigma_list,S_list,names,colors,colors2,scales,xscale_log):
     """
     plot results for n models, using matplotlib:
     - p(r) 
@@ -1040,17 +1095,3 @@ def generate_pdb(x_new,y_new,z_new,p_new,Model):
                 atom = 'O'
             f.write('ATOM  %5i  %s   ALA A%4i    %8.3f%8.3f%8.3f  1.00  0.00           %s \n'  % (i,atom,i,x_new[i],y_new[i],z_new[i],atom))
         f.write('END')
-
-def check_unique(A_list):
-    """
-    if all elements in a list are unique then return 1, else return 0
-    """
-    unique = 1
-    N = len(A_list)
-    for i in range(N):
-        for j in range(N):
-            if A_list[i] == A_list[j]:
-                unique = 0
-
-    return unique
-
