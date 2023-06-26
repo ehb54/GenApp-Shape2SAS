@@ -59,18 +59,11 @@ if __name__=='__main__':
         xscale_log = False
     except:
         xscale_log = True
-    try:
-        dummy = json_variables['high_res']
-        high_res = True
-    except:
-        high_res = False
-
     
     ## read Model-related input (from GUI)
     r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,x_list,y_list,z_list,p_list,color_list,color2_list,Model_list,scale_list,name_list = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
     for i in range(Max_Number_of_Models):
         n = i+1
-        #if 1:
         try:
             dummy = json_variables['include_model_%d' % n]
             name = json_variables['name_%d' % n] # name of model
@@ -153,87 +146,65 @@ if __name__=='__main__':
             message.udpmessage({"_textarea":"#####################################################\n" })
 
             ################### GENERATE POINTS IN USER-DEFINED SHAPES #####################################
-           
-            ## divide points up in bunches of size Npoints_threshold
-            Npoints_threshold = 10000
-            Nreps = int(Npoints/(Npoints_threshold+1))+1
-            Np = np.ones(Nreps)*(Npoints_threshold)
-            Np[-1] = Npoints%Npoints_threshold
-            if Np[-1] == 0:
-                Np[-1] = Npoints_threshold
-             
-            if Nreps > 1:
-                ## timing
-                start_pr = time.time()
 
-            ## sum over bunches
-            r_sum,pr_sum,pr_norm_sum,Dmax_sum,Rg_sum = 0,0,0,0,0
-            x_new,y_new,z_new,p_new = 0,0,0,0
-            for k in range(Nreps):  
-                 
-                ## generate points
-                message.udpmessage({"_textarea":"\n# Generating points...\n" })
-                N,rho,N_exclude,volume_total,x_k,y_k,z_k,p_k = gen_all_points(N_subunits,int(Np[k]),x,y,z,subunit_type,a,b,c,p,exclude_overlap)
-                
-                ## output
-                N_remain = []
-                for j in range(N_subunits):
-                    srho = rho[j]*p[j]
-                    N_remain.append(N[j] - N_exclude[j])
-                    message.udpmessage({"_textarea":"    generating %d points for subunit %d: %s\n" % (N[j],j+1,subunit_type[j]) })
-                    message.udpmessage({"_textarea":"       point density      : %1.2e (points per volume)\n" % rho[j]})
-                    message.udpmessage({"_textarea":"       scattering density : %1.2e (density times scattering length)\n" % srho})
-                    if exclude_overlap:
-                        message.udpmessage({"_textarea":"       excluded points    : %d (overlap region)\n" % N_exclude[j]})
-                        message.udpmessage({"_textarea":"       remaining points   : %d (non-overlapping region)\n" % N_remain[j]})
-                N_total = np.sum(N_remain)
-                message.udpmessage({"_textarea":"    total number of points: %d\n" % N_total})
-                message.udpmessage({"_textarea":"    total volume          : %1.1f A^3\n" % volume_total})
+              
+            ## timing
+            start_points = time.time()
+            message.udpmessage({"_textarea":"\n# Generating points...\n" })
 
-                ################### CALCULATE PAIR-WISE DISTANCES FOR ALL POINTS  #####################################
+            ## generate points
+            N,rho,N_exclude,volume_total,x_new,y_new,z_new,p_new = gen_all_points(N_subunits,Npoints,x,y,z,subunit_type,a,b,c,p,exclude_overlap)
 
-                if Nreps == 1:
-                    ## timing
-                    start_dist = time.time()
-                    message.udpmessage({"_textarea":"\n# Calculating distances...\n"})
+            ## vizualization: generate pdb file with points
+            Model = '_%d' % n
+            generate_pdb(x_new,y_new,z_new,p_new,Model)
 
-                ## calculate all pair-wise distances in particle (composed of all subunits) 
-                dist = calc_all_dist(x_k,y_k,z_k)
+            ## output
+            N_remain = []
+            for j in range(N_subunits):
+                srho = rho[j]*p[j]
+                N_remain.append(N[j] - N_exclude[j])
+                message.udpmessage({"_textarea":"    generating %d points for subunit %d: %s\n" % (N[j],j+1,subunit_type[j]) })
+                message.udpmessage({"_textarea":"       point density      : %1.2e (points per volume)\n" % rho[j]})
+                message.udpmessage({"_textarea":"       scattering density : %1.2e (density times scattering length)\n" % srho})
+                if exclude_overlap:
+                    message.udpmessage({"_textarea":"       excluded points    : %d (overlap region)\n" % N_exclude[j]})
+                    message.udpmessage({"_textarea":"       remaining points   : %d (non-overlapping region)\n" % N_remain[j]})
+            N_total = np.sum(N_remain)
+            message.udpmessage({"_textarea":"    total number of points: %d\n" % N_total})
+            message.udpmessage({"_textarea":"    total volume          : %1.1f A^3\n" % volume_total})
 
-                ## calculate all pair-wise contrasts
-                contrast = calc_all_contrasts(p_k)
-                
-                if Nreps == 1:
-                    ## timing
-                    time_dist = time.time() - start_dist
-                    message.udpmessage({"_textarea":"    time dist: %1.2f\n" % time_dist})
+            ## end time for point generation
+            time_points = time.time()-start_points
+            message.udpmessage({"_textarea":"    time, points          : %1.2f sec\n" % time_points})
 
-                ################### CALCULATE p(r) #####################################
-                if Nreps == 1:
-                    ## timing
-                    start_pr = time.time()
-                    message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)...\n"})
+            ################### CALCULATE PAIR-WISE DISTANCES FOR ALL POINTS  #####################################
 
-                ## calculate p(r) 
-                Model = '_%d' % n
-                r,pr,pr_norm,Dmax,Rg = calc_pr(dist,Nbins,contrast,pd,Model)
-                pr /= N_total**2 # make p(r) independent on number of points per model
-                
-                ## weighted averages
-                w = Np[k]
-                r_sum += w*r
-                pr_sum += w*pr
-                pr_norm_sum += w*pr_norm
-                Dmax_sum += w*Dmax
-                Rg_sum += w*Rg
-                
-                x_new,y_new,z_new,p_new = append_points(x_new,y_new,z_new,p_new,x_k,y_k,z_k,p_k)
+            ## timing
+            start_dist = time.time()
+            message.udpmessage({"_textarea":"\n# Calculating distances...\n"})
 
-            r,pr,pr_norm,Dmax,Rg = r_sum/Npoints,pr_sum/Npoints,pr_norm_sum/Npoints,Dmax_sum/Npoints,Rg_sum/Npoints
+            ## calculate all pair-wise distances in particle (composed of all subunits) 
+            dist = calc_all_dist(x_new,y_new,z_new)
+
+            ## calculate all pair-wise contrasts
+            contrast = calc_all_contrasts(p_new)
+
+            ## timing
+            time_dist = time.time() - start_dist
+            message.udpmessage({"_textarea":"    time dist: %1.2f\n" % time_dist})
+
+            ################### CALCULATE p(r) #####################################
+
+            ## timing
+            start_pr = time.time()
+            message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)...\n"})
+
+            ## calculate p(r) 
+            r,pr,pr_norm,Dmax,Rg = calc_pr(dist,Nbins,contrast,pd,Model)
+            pr /= N_total**2 # make p(r) independent on number of points per model
 
             ## send output to GUI
-            if Nreps > 1:
-                message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)...\n"})
             message.udpmessage({"_textarea":"    Dmax : %1.2f A\n" % Dmax})
             message.udpmessage({"_textarea":"    Rg   : %1.2f A\n" % Rg})
 
@@ -337,13 +308,10 @@ if __name__=='__main__':
     message.udpmessage({"_textarea":"\n# Making plots of p(r) and I(q)...\n"})
     
     ## plot 2D projections
-    plot_2D(x_list,y_list,z_list,p_list,color_list,Model_list,high_res)
-
-    ## 3D vizualization: generate pdb file with points
-    generate_pdb(x_list,y_list,z_list,p_list,Model_list)
+    plot_2D(x_list,y_list,z_list,p_list,color_list,Model_list)
 
     ## plot p(r) and I(q)
-    plot_results(q,r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,name_list,color_list,color2_list,scale_list,xscale_log,high_res)
+    plot_results(q,r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,name_list,color_list,color2_list,scale_list,xscale_log)
     output["fig"] = "%s/plot.png" % folder
     
     ## compress (zip) results for output

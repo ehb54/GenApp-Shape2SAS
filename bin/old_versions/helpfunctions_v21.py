@@ -736,7 +736,7 @@ def simulate_data(q,I,I0,exposure,Model):
     ## simulate exp error, other approach, also sedlak errors
 
     # set constants
-    k = 4500
+    k = 1400
     c = 0.85
     
     # convert from intensity units to counts
@@ -746,11 +746,17 @@ def simulate_data(q,I,I0,exposure,Model):
     # make N
     N = k*q # original expression from Sedlak2017 paper
 
-    qt = 1.4 # threshold - above this q value, the linear expression do not hold
-    a = 3.0 # empirical constant 
-    b = 0.6 # empirical constant
-    idx = np.where(q>qt)
-    N[idx] = k*qt*np.exp(-0.5*((q[idx]-qt)/b)**a)
+    qt = 0.25 # threshold - above this q value, the linear expression do not hold
+    s = 2/3 # empirical constant - constant value to approach, relative to N(qt). Between 0 and 1
+    p = 8 # empirical constant
+    idx = np.where(q>=qt)
+    N[idx] = k*((1-s)*(qt/q[idx])**p + s)*qt
+
+    #kk = 1/(1-s)/qt**(1+p)
+    #y = 1/q**p + s*kk*qt
+    #idx = np.where(q<qt)
+    #y[idx] =kk*q[idx]
+    #N = k*y/kk
 
     # make I(q_arb)
     q_max = np.amax(q)
