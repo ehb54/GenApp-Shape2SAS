@@ -263,10 +263,10 @@ if __name__=='__main__':
                 message.udpmessage({"_textarea":"    hard-sphere radius :  %1.2f\n" % R_HS})
             elif Stype == 'Aggr':
                 # aggregate structure factor: fractal aggregate with dimensionality 2
-                S = calc_S_aggr(q,Reff,Naggr)
-                message.udpmessage({"_textarea":"    fraction of aggregates :  %1.2f\n" % frac})
-                message.udpmessage({"_textarea":"    effective radius of aggregates :  %1.2f\n" % Reff})
-                message.udpmessage({"_textarea":"    particles per aggregate :  %1.2f\n" % Naggr})
+                S = calc_S_aggr(q,R_aggr,N_aggr)
+                message.udpmessage({"_textarea":"    fraction of aggregates :  %1.2f\n" % fracs_aggr})
+                message.udpmessage({"_textarea":"    effective radius of aggregates :  %1.2f\n" % R_aggr})
+                message.udpmessage({"_textarea":"    particles per aggregate :  %1.2f\n" % N_aggr})
             else:
                 S = np.ones(len(q))
             # decoupling approx
@@ -274,7 +274,7 @@ if __name__=='__main__':
 
             # fraction of aggregates
             if Stype == 'Aggr':
-                S_eff = (1-frac) + frac*S_eff
+                S_eff = (1-fracs_aggr) + fracs_aggr*S_eff
 
             ## calculate normalised intensity = P(q)*S(q)
             I = calc_Iq(q,Pq,S_eff,sigma_r,Model)
