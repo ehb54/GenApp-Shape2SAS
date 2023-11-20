@@ -32,18 +32,10 @@ all other files are:
 - old versions of the above    
 
 ### Cite
-please cite:     
-Steen Hansen (1990)    
-Journal of Applied Crystallography 23, 344-346     
-Calculation of small-angle scattering profiles using Monte Carlo simulation    
-
-Alexey Savelyev, Emre Brookes (2019)    
-Future Generation Computer Systems 94, 929-936    
-GenApp: Extensible tool for rapid generation of web and native GUI applications    
-
-and please acknowledge:    
-Andreas Haahr Larsen who wrote the program and GUI    
-Emre Brookes, who maintains GenApp and supports development of new programs and features   
+please cite:   
+Andreas H. Larsen, Emre Brookes, Martin C. Pedersen and Jacob J.K. Kirkensgaard (2023)     
+Journal of Applied Crystallography 56, 1287-1294    
+Shape2SAS: a web application to simulate small-angle scattering data and pair distance distributions from user-defined shapes    
 
 ## Contact
 Andreas Haahr Larsen    
