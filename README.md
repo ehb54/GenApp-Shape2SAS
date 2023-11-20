@@ -35,6 +35,7 @@ all other files are:
 Andreas H. Larsen, Emre Brookes, Martin C. Pedersen and Jacob J.K. Kirkensgaard (2023)     
 Journal of Applied Crystallography 56, 1287-1294    
 Shape2SAS: a web application to simulate small-angle scattering data and pair distance distributions from user-defined shapes    
+https://doi.org/10.1107/S1600576723005848    
 
 ## Contact
 Andreas Haahr Larsen    
