@@ -1,371 +1,274 @@
 #!/usr/bin/python3
 
-import json
-import io
-import sys
-import os
-import socket # for sending progress messages to textarea
-from genapp3 import genapp
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import gridspec
-import subprocess
-from helpfunctions import * 
 import time
-from fast_histogram import histogram1d #histogram1d from fast_histogram is faster than np.histogram (https://pypi.org/project/fast-histogram/) 
-import gc # garbage collector for freeing memory
-from sys import getsizeof
+import argparse
+from sys import argv
+import numpy as np
+import shutil
+from shape2sas_helpfunctions import *
 
-if __name__=='__main__':
-    
-    ## time
+# current version
+version = 2.4
+
+if __name__ == "__main__":
+       
+    ## remove existing log file
+    open('shape2sas.log','w').close()
+
+    ### welcome message
+    printt('#######################################################################################')
+    printt('RUNNING shape2sas.py version %s \n - for instructions type: python shape2sas.py -h' % version)
+    command = "python shape2sas.py"
+    for aa in argv[1:]:
+        if ' ' in aa:
+            command += " \"%s\"" % aa
+        else:
+            command += " %s" % aa
+    printt('command used: %s' % command)
+    printt('#######################################################################################')
+
+    # timing
     start_total = time.time()
 
-    ################# HARD-CODED VARIABLES #######################################
+    ### input values 
+    parser = argparse.ArgumentParser(description='Shape2SaS - calculates small-angle scattering from a given shape defined by the user.')
+      
+    # Mandatory inputs
+    parser.add_argument('-s', '--subunit', type=separate_string, nargs='+', action='extend',
+                       help='Type of subunits for each model.')
+    parser.add_argument('-d', '--dimension', type=float_list, nargs='+', action='append',
+                        help='dimensions of subunits for each model.')
     
-    Max_Number_of_Models = 4
-    color_all = ['red','blue','orange','forestgreen']
-    color2_all= ['firebrick','royalblue','darkorange','darkgreen']
+    # Optional model-dependent inputs:
+    parser.add_argument('-m', '--model_name', nargs='+', action='extend',
+                        help='Name of model.')
+    parser.add_argument('-sld', '--sld', type=float, nargs='+', action='append',
+                        help='excess scattering length density or contrast.')
+    parser.add_argument('-pd', '--polydispersity', type=float, nargs='+', action='extend',
+                        help='Polydispersity of subunits for each model.')
+    parser.add_argument('-com', '--com', type=float_list, nargs='+', action='append',
+                         help='displacement for each subunits in each model.')
+    parser.add_argument('-rot', '--rotation', type=float_list, nargs='+', action='append',
+                         help='rotation for each subunits in each model.')
+    parser.add_argument('-sigmar', '--sigma_r', type=float, nargs='+', action='extend',
+                        help='interface roughness for each model.')
+    parser.add_argument('-c', '--conc', type=float, nargs='+', action='extend',
+                        help='volume fraction concentration.')
+    parser.add_argument('-exclude', '--exclude_overlap', type=str2bool, nargs='+', action='extend',
+                        help='bool to exclude overlap.')
+
+    # Optional structure factor related inputs
+    parser.add_argument('-S', '--S', type=str, nargs='+', action='extend',
+                        help='structure factor: None/HS/aggregation in each model.')
+    parser.add_argument('-Sp', '--S_par', type=float_list, nargs='+', action='append',
+                        help='parameters of structure factor for each model.')
+
+    # Optional general inputs
+    parser.add_argument('-qmin', '--qmin', type=float, default=SimulationParameters.qmin, 
+                        help='Minimum q-value for the scattering curve.')
+    parser.add_argument('-qmax', '--qmax', type=float, default=SimulationParameters.qmax, 
+                        help='Maximum q-value for the scattering curve.')
+    parser.add_argument('-Nq', '--qpoints', type=int, default=SimulationParameters.qpoints, 
+                        help='Number of points in q.')
+    parser.add_argument('-Np', '--prpoints', type=int, default=SimulationParameters.prpoints, 
+                        help='Number of points in the pair distance distribution function.')
+    parser.add_argument('-N', '--Npoints', type=int, default=SimulationParameters.Npoints, 
+                        help='Number of simulated points per model.')
+    parser.add_argument('-expo', '--exposure', type=float, default=500, 
+                        help='Exposure time in arbitrary units.')
+
+    # Optional plot options
+    parser.add_argument('-lin', '--xscale_lin', action='store_true', default=False, 
+                        help='include flag (no input) to make q scale linear instead of logarithmic.')
+    parser.add_argument('-hres', '--high_res', action='store_true', default=False, 
+                        help='include flag (no input) to output high resolution plot.')
+
+    # Optional SESANS-related options (Shape2SESANS)
+    parser.add_argument('-ss', '--sesans', action='store_true', default=False,
+                        help='Calculate SESANS data from the SAS data.')
+    parser.add_argument('-sse', '--sesans_error', type=float, default=0.02, 
+                        help='Baseline SESANS error relative to max signal.')
+    parser.add_argument('-Nd', '--deltapoints', type=int, default=150,
+                        help='Number of points in delta.')
     
-    ################# GUI SETUP ##################################################
+    args = parser.parse_args()
+
+    ################################ Read input values ################################
+
+    if args.sesans:
+        # make extended q-range for sesans
+        Sim_par = SimulationParameters(qmin=1e-6, qmax=0.1, qpoints=20000, prpoints=args.prpoints, Npoints=args.Npoints)
+    else:
+        Sim_par = SimulationParameters(qmin=args.qmin, qmax=args.qmax, qpoints=args.qpoints, prpoints=args.prpoints, Npoints=args.Npoints)
     
-    ## read json variables
-    argv_io_string = io.StringIO(sys.argv[1])
-    json_variables = json.load(argv_io_string)
+    # read subunit type(s)
+    if args.subunit is None:
+        raise argparse.ArgumentError(args.subunit, "No subunit type was given as an input.")
     
-    ## output folder
-    folder = json_variables['_base_directory'] # output folder dir
-
-    ## setup  messaging in GUI
-    message = genapp(json_variables)
-    output = {} # create an empty python dictionary
-
-   ################### IMPORT INPUT FROM GUI #####################################
-
-    ## global input (from GUI)
-    qmin = float(json_variables['qmin'])
-    qmax = float(json_variables['qmax'])
-    Nq = int(json_variables['qpoints']) # number of points in (simulated) q
-    exposure = float(json_variables['exposure'])
-    Nbins = int(json_variables['prpoints']) # number of points in p(r)
-    Npoints = int(json_variables['Npoints']) # max number of points per model
-
-    ## generate q vector
-    q = generate_q(qmin,qmax,Nq)
-
-    ## plot options
-    try:
-        dummy = json_variables['xscale_lin']
-        xscale_log = False
-    except:
-        xscale_log = True
-    try:
-        dummy = json_variables['high_res']
-        high_res = True
-    except:
-        high_res = False
-
+    # read dimensions
+    if args.dimension is None:
+        raise argparse.ArgumentError(args.dimension, "No dimensions were given as an input.")
+    for subunit, dimension in zip(args.subunit, args.dimension):
+         if len(subunit) != len(dimension):
+            raise argparse.ArgumentTypeError("Mismatch between number subunit types (%d) and dimensions lists (%d)." % (len(subunit),len(dimension)))
     
-    ## read Model-related input (from GUI)
-    r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,x_list,y_list,z_list,p_list,color_list,color2_list,Model_list,scale_list,name_list = [],[],[],[],[],[],[],[],[],[],[],[],[],[],[]
-    for i in range(Max_Number_of_Models):
-        n = i+1
-        #if 1:
+    # read number of models
+    num_models = len(args.subunit)
+    if num_models == 1:
+        printt(f"Simulating {num_models} model...")
+    else: 
+        printt(f"Simulating {num_models} models...")
+
+    # prepare lists (if several models are simulated simultaneously)
+    r_list, pr_norm_list, I_list, Isim_list, sigma_list, S_eff_list = [], [], [], [], [], [] 
+    x_list, y_list, z_list, sld_list, model_filename_list, name_list = [], [], [], [], [], []
+    if args.sesans:
+        delta_list,G_list,Gsim_list,sigma_G_list = [],[],[],[]
+
+    # loop over models
+    for i in range(num_models):
+        
+        # read model name for model i
+        model_name = check_input(args.model_name, f"Model {i}", "model name", i)
+        if model_name in name_list:
+            #model names should be unique
+            model_name += '_' + str(i+1)  
+
+        printt(" ")
+        printt(f"    Generating points for Model: " + model_name)
+
+        # read subunit and dimensions for model i
+        N_subunits = len(args.subunit[i])
+
+        #read for SLD, COM, and rotation for model i
+        sld = check_3Dinput(args.sld, [1.0], "SLD", N_subunits, i)
+        com = check_3Dinput(args.com, [[0, 0, 0]], "COM", N_subunits, i)
+        rotation = check_3Dinput(args.rotation, [[0, 0, 0]], "rotation", N_subunits, i)
+
+        #read exclude overlap input
+        exclude_overlap = check_input(args.exclude_overlap, True, "exclude_overlap", i)
+
+        #make point cloud
+        Distr = getPointDistribution(args.subunit[i],sld,args.dimension[i],com,rotation,exclude_overlap,args.Npoints)
+        
+        ################################# Calculate Theoretical I(q) #################################
+        printt(" ")
+        printt("    Calculating intensity, I(q)...")
+
+        # read polydispersity and concentration values (or use default values)
+        pd = check_input(args.polydispersity, 0.0, "polydispersity", i)
+        conc = check_input(args.conc, 0.02, "concentration", i)
+
+        #read structure factor (default None) and related parameters
+        Stype = check_input(args.S, 'None', "Structure type", i)
         try:
-            dummy = json_variables['include_model_%d' % n]
-            name = json_variables['name_%d' % n] # name of model
-            try:
-                dummy = json_variables['exclude_overlap_%d' % n]
-                exclude_overlap = 1
-            except:
-                exclude_overlap = 0
-            subunit_type = json_variables['subunit_type_%d' % n]
-            N_subunits = len(subunit_type)
-            a_s = json_variables['a_%d' % n]
-            b_s = json_variables['b_%d' % n]
-            c_s = json_variables['c_%d' % n]
-            p_s = json_variables['p_%d' % n]
-            x_s = json_variables['x_%d' % n]
-            y_s = json_variables['y_%d' % n]
-            z_s = json_variables['z_%d' % n]
-
-            # loop over subunits to assign float values to subunits dimensions, contrast and com position
-            a,b,c,p,x,y,z = [],[],[],[],[],[],[]
-            for j in range(N_subunits):
-                try:
-                    a.append(float(a_s[j]))
-                except:
-                    a.append(50.0)
-                try:
-                    b.append(float(b_s[j]))
-                    if subunit_type[j] in ['hollow_sphere','hollow_cube','cyl_ring','disc_ring']:
-                        if b[j] == a[j]:
-                            message.udpmessage({"_textarea":"!!WARNING!!\n! As b = a, you get a %s with an infinitely thin shell\n" % subunit_type[j]})
-                            message.udpmessage({"_textarea":"! In principle, for shells,  the density is inf, but in the program, volume has been set equal to the area\n"})
-                        if b[j] > a[j]:
-                            message.udpmessage({"_textarea":"!!WARNING!!\n! b > a in %s not possible, setting b = a and a = b\n" % subunit_type[j] })
-                except:
-                    if subunit_type[j] in ['hollow_sphere','hollow_cube']:
-                        b.append(0.5*a[j])
-                    else:
-                        b.append(a[j])
-                try:
-                    c.append(float(c_s[j]))
-                except:
-                    if subunit_type[j] in ['ellipsoid','cylinder','cuboid','cyl_ring']:
-                        c.append(4*a[j])
-                    elif subunit_type[j] in ['disc','disc_ring']:
-                        c.append(0.5*a[j])
-                    else:
-                        c.append(0.0)
-                try:
-                    p.append(float(p_s[j]))
-                except:
-                    p.append(1.0)
-                try:
-                    x.append(float(x_s[j]))
-                except:
-                    x.append(0.0)
-                try:
-                    y.append(float(y_s[j]))
-                except:
-                    y.append(0.0)
-                try:
-                    z.append(float(z_s[j]))
-                except:
-                    z.append(0.0)
-
-            pd = float(json_variables['polydispersity_%d' % n])
-            Stype = json_variables['S_%d' % n]
-            if Stype == 'HS':
-                R_HS = float(json_variables['r_hs_%d' % n]) # hard-sphere radius
-            if Stype == 'Aggr':
-                fracs_aggr = float(json_variables['frac_%d' % n]) # fraction of particles in aggregated form
-                R_aggr = float(json_variables['R_eff_%d' % n]) # effective radius per particle in aggregate
-                N_aggr = float(json_variables['N_aggr_%d' % n]) # number of particles per aggregate
-            conc = float(json_variables['conc_%d' % n]) # volume fraction (concentration)
-            sigma_r = float(json_variables['sigma_r_%d' % n]) # interface roughness
-            scale = float(json_variables['scale%d' % n]) # in the plot, scale simulated intensity of Model n
-
-            # print to stdout
-            message.udpmessage({"_textarea":"\n#####################################################\n" })
-            message.udpmessage({"_textarea":"##########   MODEL %d: %s   #####################\n" % (n,name) })
-            message.udpmessage({"_textarea":"#####################################################\n" })
-
-            ################### GENERATE POINTS IN USER-DEFINED SHAPES #####################################
-           
-            ## divide points up in bunches of size Npoints_threshold
-            Npoints_threshold = 10000
-            Nreps = int(Npoints/(Npoints_threshold+1))+1
-            Np = np.ones(Nreps)*(Npoints_threshold)
-            Np[-1] = Npoints%Npoints_threshold
-            if Np[-1] == 0:
-                Np[-1] = Npoints_threshold
-             
-            if Nreps > 1:
-                ## timing
-                start_pr = time.time()
-
-            ## sum over bunches
-            r_sum,pr_sum,pr_norm_sum,Dmax_sum,Rg_sum = 0,0,0,0,0
-            x_new,y_new,z_new,p_new = 0,0,0,0
-            for k in range(Nreps):  
-                 
-                ## generate points
-                message.udpmessage({"_textarea":"\n# Generating points...\n" })
-                N,rho,N_exclude,volume_total,x_k,y_k,z_k,p_k = gen_all_points(N_subunits,int(Np[k]),x,y,z,subunit_type,a,b,c,p,exclude_overlap)
-                
-                ## output
-                N_remain = []
-                for j in range(N_subunits):
-                    srho = rho[j]*p[j]
-                    N_remain.append(N[j] - N_exclude[j])
-                    message.udpmessage({"_textarea":"    generating %d points for subunit %d: %s\n" % (N[j],j+1,subunit_type[j]) })
-                    message.udpmessage({"_textarea":"       point density      : %1.2e (points per volume)\n" % rho[j]})
-                    message.udpmessage({"_textarea":"       scattering density : %1.2e (density times scattering length)\n" % srho})
-                    if exclude_overlap:
-                        message.udpmessage({"_textarea":"       excluded points    : %d (overlap region)\n" % N_exclude[j]})
-                        message.udpmessage({"_textarea":"       remaining points   : %d (non-overlapping region)\n" % N_remain[j]})
-                N_total = np.sum(N_remain)
-                message.udpmessage({"_textarea":"    total number of points: %d\n" % N_total})
-                message.udpmessage({"_textarea":"    total volume          : %1.1f A^3\n" % volume_total})
-
-                ################### CALCULATE PAIR-WISE DISTANCES FOR ALL POINTS  #####################################
-
-                if Nreps == 1:
-                    ## timing
-                    start_dist = time.time()
-                    message.udpmessage({"_textarea":"\n# Calculating distances...\n"})
-
-                ## calculate all pair-wise distances in particle (composed of all subunits) 
-                dist = calc_all_dist(x_k,y_k,z_k)
-
-                ## calculate all pair-wise contrasts
-                contrast = calc_all_contrasts(p_k)
-                
-                if Nreps == 1:
-                    ## timing
-                    time_dist = time.time() - start_dist
-                    message.udpmessage({"_textarea":"    time dist: %1.2f\n" % time_dist})
-
-                ################### CALCULATE p(r) #####################################
-                if Nreps == 1:
-                    ## timing
-                    start_pr = time.time()
-                    message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)...\n"})
-
-                ## calculate p(r) 
-                Model = '_%d' % n
-                r,pr,pr_norm,Dmax,Rg = calc_pr(dist,Nbins,contrast,pd,Model)
-                pr /= N_total**2 # make p(r) independent on number of points per model
-                
-                ## weighted averages
-                w = Np[k]
-                r_sum += w*r
-                pr_sum += w*pr
-                pr_norm_sum += w*pr_norm
-                Dmax_sum += w*Dmax
-                Rg_sum += w*Rg
-                
-                x_new,y_new,z_new,p_new = append_points(x_new,y_new,z_new,p_new,x_k,y_k,z_k,p_k)
-
-            r,pr,pr_norm,Dmax,Rg = r_sum/Npoints,pr_sum/Npoints,pr_norm_sum/Npoints,Dmax_sum/Npoints,Rg_sum/Npoints
-
-            ## send output to GUI
-            if Nreps > 1:
-                message.udpmessage({"_textarea":"\n# Making p(r) (weighted histogram)...\n"})
-            message.udpmessage({"_textarea":"    Dmax : %1.2f A\n" % Dmax})
-            message.udpmessage({"_textarea":"    Rg   : %1.2f A\n" % Rg})
-
-            ## timing
-            time_pr = time.time() - start_pr
-            message.udpmessage({"_textarea":"    time p(r): %1.2f sec\n" % time_pr})
-
-            ################### CALCULATE I(q) using histogram  #####################################
-
-            ## timing
-            start_Iq = time.time()
-            message.udpmessage({"_textarea":"\n# Calculating intensity, I(q)...\n"})
-            message.udpmessage({"_textarea":"    volume fraction :  %1.2f\n" % conc})
-            if sigma_r > 0:
-                message.udpmessage({"_textarea":"    sigma_r :  %1.2f\n" % sigma_r})
-
-            ## calculate forward scattering and form factor
-            I0,Pq = calc_Pq(q,r,pr)
-
-            I0 *= conc*volume_total*1E-4 # make I0 scale with volume fraction (concentration) and volume squared and scale so default values gives I(0) of approx unity
-            message.udpmessage({"_textarea":"    I(0) :  %1.2e\n" % I0})
-
-            ## calculate structure factor
-            if Stype == 'HS':
-                # hard sphere structure factor
-                S = calc_S_HS(q,conc,R_HS)
-                message.udpmessage({"_textarea":"    hard-sphere radius :  %1.2f\n" % R_HS})
-            elif Stype == 'Aggr':
-                # aggregate structure factor: fractal aggregate with dimensionality 2
-                S = calc_S_aggr(q,R_aggr,N_aggr)
-                message.udpmessage({"_textarea":"    fraction of aggregates :  %1.2f\n" % fracs_aggr})
-                message.udpmessage({"_textarea":"    effective radius of aggregates :  %1.2f\n" % R_aggr})
-                message.udpmessage({"_textarea":"    particles per aggregate :  %1.2f\n" % N_aggr})
-            else:
-                S = np.ones(len(q))
-            # decoupling approx
-            S_eff = decoupling_approx(q,x_new,y_new,z_new,p_new,Pq,S)
-
-            # fraction of aggregates
-            if Stype == 'Aggr':
-                S_eff = (1-fracs_aggr) + fracs_aggr*S_eff
-
-            ## calculate normalised intensity = P(q)*S(q)
-            I = calc_Iq(q,Pq,S_eff,sigma_r,Model)
-
-            ## simulate data
-            Isim,sigma = simulate_data(q,I,I0,exposure,Model)
-
-            ## timing
-            time_Iq = time.time() - start_Iq
-            message.udpmessage({"_textarea":"    time I(q) :  %1.2f sec\n" % time_Iq})
-
-            ################### OUTPUT to GUI #####################################
-            
-            output["pr%s" % Model] = "%s/pr%s.dat" % (folder,Model)
-            output["Iq%s" % Model] = "%s/Iq%s.dat" % (folder,Model)
-            output["Isim%s" % Model] = "%s/Isim%s.dat" % (folder,Model)
-            output["pdb%s" % Model] = "%s/model%s.pdb" % (folder,Model)
-            output["Dmax%s" % Model] = "%1.2f" % Dmax
-            output["Rg%s" % Model] = "%1.2f" % Rg
-            output["pdb_jmol%s" % Model] = "%s/model%s.pdb" % (folder,Model)
-
-            ## save variables for plots
-            r_list.append(r)
-            pr_norm_list.append(pr_norm)
-            I_list.append(I)
-            Isim_list.append(Isim)
-            sigma_list.append(sigma)
-            S_eff_list.append(S_eff)
-            x_list.append(x_new)
-            y_list.append(y_new)
-            z_list.append(z_new)
-            p_list.append(p_new)
-            color_list.append(color_all[i])
-            color2_list.append(color2_all[i])
-            Model_list.append(Model)
-            scale_list.append(scale)
-            name_list.append(name)
-            del x_new,y_new,z_new,p_new
-
+            S_par = args.S_par[i][0]
         except:
-            pass
+            S_par = []
 
-    ## check input
-    if len(scale_list) == 0:
-        message.udpmessage({"_textarea":"\n############################################################\n" })
-        message.udpmessage({"_textarea":"##########   You need to include at least 1 model ##########\n" })
-        message.udpmessage({"_textarea":"############################################################\n" })
-        exit()
+        #read interface roughness (default none)
+        sigma_r = check_input(args.sigma_r, 0.0, "sigma_r", i)
 
-    ################### GENERATING PLOTS  #####################################
+        #calculate theoretical scattering
+        Theo_calc = TheoreticalScatteringCalculation(System=ModelSystem(PointDistribution=Distr, 
+                                                                        Stype=Stype, par=S_par, 
+                                                                        polydispersity=pd, conc=conc, 
+                                                                        sigma_r=sigma_r), 
+                                                                        Calculation=Sim_par)
+        Theo_I = getTheoreticalScattering(Theo_calc)
 
-    message.udpmessage({"_textarea":"\n#####################################################\n" })
-    message.udpmessage({"_textarea":"##########   PLOTS AND OUTPUT  ######################\n"})
-    message.udpmessage({"_textarea":"#####################################################\n" })
+        #save models
+        model_filename = "_".join(model_name.split()) # remove whitespace
+        WeightedPairDistribution.save_pr(args.prpoints, Theo_I.r, Theo_I.pr, model_filename)
+        StructureFactor.save_S(Theo_I.q, Theo_I.S_eff, model_filename)
+        ITheoretical(Theo_I.q).save_I(Theo_I.I, model_filename)
 
-    ## start time for output generation
-    start_output = time.time()
+        #save points
+        save_points(np.concatenate(Distr.x), np.concatenate(Distr.y), np.concatenate(Distr.z), np.concatenate(Distr.sld), model_filename)
+
+        ######################################### Simulate I(q) ##########################################
+        exposure = args.exposure
+        Sim_calc = SimulateScattering(q=Theo_I.q, I0=Theo_I.I0, I=Theo_I.I, exposure=exposure)
+        Sim_I = getSimulatedScattering(Sim_calc)
+
+        # Save simulated I(q) using IExperimental
+        Isim_class = IExperimental(q=Sim_I.q, I0=Theo_I.I0, I=Theo_I.I, exposure=exposure)
+        Isim_class.save_Iexperimental(Sim_I.I_sim, Sim_I.I_err, model_filename)
+
+        ######################################### save data for plots ##########################################
+        x_list.append(np.concatenate(Distr.x))
+        y_list.append(np.concatenate(Distr.y))
+        z_list.append(np.concatenate(Distr.z))
+        sld_list.append(np.concatenate(Distr.sld))
+
+        r_list.append(Theo_I.r)
+        pr_norm_list.append(Theo_I.pr_norm)
+        I_list.append(Theo_I.I)
+        S_eff_list.append(Theo_I.S_eff)
+
+        Isim_list.append(Sim_I.I_sim)
+        sigma_list.append(Sim_I.I_err)
+
+        model_filename_list.append(model_filename)
+        name_list.append(model_name)
+
+        ######################################### SESANS ##########################################
+
+        if args.sesans:
+            # make spin echo length (delta) range (x-axis in SESANS)
+            delta = np.linspace(0, 3 * np.max(Theo_I.r), args.deltapoints)
+            G = calc_G_sesans(Theo_I.q,delta,Theo_I.I)
+
+            # simulate noisy sesans data         
+            G_sim,sigma_G = simulate_sesans(delta,G,args.sesans_error)
+            
+            # append to list (in case of multiple models)
+            delta_list.append(delta)
+            G_list.append(G)
+            Gsim_list.append(G_sim)
+            sigma_G_list.append(sigma_G)
+
+
+    printt(" ")
+    printt("Generating plots...")
+    colors = ['blue','red','green','orange','purple','cyan','magenta','black','grey','pink','forrestgreen']
+
+    #plot 2D projections
+    for m in model_filename_list:
+        print("    2D projection: points_" + m + ".png ...")
+    plot_2D(x_list, y_list, z_list, sld_list, model_filename_list, args.high_res, colors)
     
-    ## generate plots of p(r) and I(q) 
-    message.udpmessage({"_textarea":"\n# Making plots of p(r) and I(q)...\n"})
+    #3D vizualization: generate pdb file with points
+    for m in model_filename_list:
+        print("    3D models: " + m + ".pdb ...")
+    generate_pdb(x_list, y_list, z_list, sld_list, model_filename_list)
     
-    ## plot 2D projections
-    plot_2D(x_list,y_list,z_list,p_list,color_list,Model_list,high_res)
+    #plot p(r) and I(q)
+    print("    plot pr and Iq and Isim: plot.png ...")
+    plot_results(Theo_I.q, r_list, pr_norm_list, I_list, Isim_list, 
+                 sigma_list, S_eff_list, name_list, args.xscale_lin, args.high_res, colors)
 
-    ## 3D vizualization: generate pdb file with points
-    generate_pdb(x_list,y_list,z_list,p_list,Model_list)
+    #plot and save sesans
+    if args.sesans:
+        plot_sesans(delta_list, G_list, Gsim_list, sigma_G_list, name_list, args.high_res, colors)
+        save_sesans(delta_list, G_list, Gsim_list, sigma_G_list, model_filename_list)
 
-    ## plot p(r) and I(q)
-    plot_results(q,r_list,pr_norm_list,I_list,Isim_list,sigma_list,S_eff_list,name_list,color_list,color2_list,scale_list,xscale_log,high_res)
-    output["fig"] = "%s/plot.png" % folder
-    
-    ## compress (zip) results for output
-    unique = check_unique(Model_list)
-    for (Model,name) in zip(Model_list,name_list):
-        name2 = name.replace(" ", "_")
-        if unique:
-            filename = "%s.zip" % name2
+    time_total = time.time() - start_total
+    printt(" ")
+    printt("Simulation successfully completed.")
+    printt("    Total run time: " + str(round(time_total, 1)) + " seconds.")
+    printt(" ")
+
+    # close log file and copy into model directories
+    #f_out.close()
+    for model_filename in model_filename_list:
+        shutil.copy('shape2sas.log','%s/%s.log' % (model_filename,model_filename))
+        if args.high_res:
+            shutil.copy('plot.pdf','%s/plot_%s.pdf' % (model_filename,model_filename))
         else:
-            filename = "%s_model%s" % (name2,Model)
-        output["points%s" % Model] = "%s/points%s.png" % (folder,Model)
-        os.system('zip %s pr%s.dat Iq%s.dat Sq%s.dat Isim%s.dat model%s.pdb points%s.png plot.png' % (filename,Model,Model,Model,Model,Model,Model))
-        output["zip%s" % Model] = "%s/%s" % (folder,filename)
-
-    ## timing for output generation
-    time_output = time.time()-start_output
-    message.udpmessage({"_textarea":"    time plots: %1.2f sec\n" % time_output}) 
-    
-    ## total time
-    time_total = time.time()-start_total
-    message.udpmessage({"_textarea":"\n# Finished succesfully.\n    time total: %1.2f sec\n" % time_total})
-
-    ## send output to GUI
-    print( json.dumps(output) ) # convert dictionary to json and output
-
+            shutil.copy('plot.png','%s/plot_%s.png' % (model_filename,model_filename))
+        if args.sesans:
+            if args.high_res:
+                shutil.copy('sesans.pdf','%s/sesans_%s.pdf' % (model_filename,model_filename))
+            else:
+                shutil.copy('sesans.png','%s/sesans_%s.png' % (model_filename,model_filename))
