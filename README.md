@@ -1,8 +1,14 @@
 # GenApp-Shape2SAS
+  
+See full documantation at the main GitHub page:
+[github.com/andreashlarsen/Shape2SAS](https://github.com/andreashlarsen/shape2sas)
 
+<<<<<<< HEAD
 See full documantation at the main GitHub page: 
 [github.com/andreashlarsen/Shape2SAS](https://github.com/andreashlarsen/shape2sas)
 
+=======
+>>>>>>> e94e6d7920372f1e049e23b919a364dbc552f3a7
 This is the GitHub for the web application, which calls the main script
 
 ## How to run the program
@@ -16,9 +22,15 @@ via the web application:
 GUI input/output
 
 ### bin/shape2sas_wrapper.py
+<<<<<<< HEAD
 python wrapper.   
 <<<<<<< HEAD
 takes input from GUI, send to the main script `shape2sas.py` functions and return output to GUI.   
+=======
+python wrapper.
+<<<<<<< HEAD
+takes input from GUI, send to the main script `shape2sas.py` functions and return output to GUI.
+>>>>>>> e94e6d7920372f1e049e23b919a364dbc552f3a7
 
 ## Contact
 Andreas Haahr Larsen
