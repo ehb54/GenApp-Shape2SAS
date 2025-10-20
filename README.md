@@ -3,18 +3,15 @@
 See full documantation at the main GitHub page:
 [github.com/andreashlarsen/Shape2SAS](https://github.com/andreashlarsen/shape2sas)
 
-<<<<<<< HEAD
-See full documantation at the main GitHub page: 
-[github.com/andreashlarsen/Shape2SAS](https://github.com/andreashlarsen/shape2sas)
-
-=======
->>>>>>> e94e6d7920372f1e049e23b919a364dbc552f3a7
-This is the GitHub for the web application, which calls the main script
+This is the GitHub for the web application, which calls the main script documented in the main GibHub
 
 ## How to run the program
 
-via the web application:
+run via the web application:
 [somo.chem.utk.edu](https://somo.chem.utk.edu/shape2sas/)
+
+or install a local copy to run in terminal - instructions: 
+[github.com/andreashlarsen/Shape2SAS](https://github.com/andreashlarsen/shape2sas)
 
 ## Files that are not descriped in the main GitHub
 
@@ -22,15 +19,7 @@ via the web application:
 GUI input/output
 
 ### bin/shape2sas_wrapper.py
-<<<<<<< HEAD
-python wrapper.   
-<<<<<<< HEAD
-takes input from GUI, send to the main script `shape2sas.py` functions and return output to GUI.   
-=======
-python wrapper.
-<<<<<<< HEAD
-takes input from GUI, send to the main script `shape2sas.py` functions and return output to GUI.
->>>>>>> e94e6d7920372f1e049e23b919a364dbc552f3a7
+python wrapper: takes input from GUI, send to the main script `shape2sas.py` functions and return output to GUI.
 
 ## Contact
 Andreas Haahr Larsen
