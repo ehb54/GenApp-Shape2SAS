@@ -17,6 +17,7 @@ GUI input/output
 
 ### bin/shape2sas_wrapper.py
 python wrapper.   
+<<<<<<< HEAD
 takes input from GUI, send to the main script `shape2sas.py` functions and return output to GUI.   
 
 ## Contact
