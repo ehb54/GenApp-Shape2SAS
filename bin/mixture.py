@@ -7,7 +7,7 @@ from shape2sas_helpfunctions import *
 
 if __name__ == "__main__":
 
-    # input arguments
+    ### input arguments
     parser = argparse.ArgumentParser(description='Compare results from Shape2SAS')
     parser.add_argument('-m', '--model_names',help='Model names')
     parser.add_argument('-f', '--fractions',help='relative fractions of populations',default=False)
@@ -22,7 +22,7 @@ if __name__ == "__main__":
     parser.add_argument('-expo', '--exposure', type=float, default=500, help='Exposure time in arbitrary units.')
     args = parser.parse_args()
 
-    # colors and models
+    ### colors, models, fractions
     colors = ['blue','red','green','orange','purple','cyan','magenta','grey','pink','forrestgreen']
     models = re.split('[ ,]+', args.model_names)
     fractions = [float(f) for f in re.split('[ ,]+', args.fractions)]
@@ -56,7 +56,6 @@ if __name__ == "__main__":
             exit()
         ax[0].plot(r,pr,color=colors[i],label=model)
 
-
         Iq_filename = model + '/Iq_' + model + '.dat'
         q,I = np.genfromtxt(Iq_filename,skip_header=2,unpack=True)
         ax[1].plot(q,I,color=colors[i],label=model)
@@ -87,7 +86,6 @@ if __name__ == "__main__":
     else:
         name = args.name
     folder = 'mixture_' + name
-    os.makedirs(folder, exist_ok=True)
 
     r_mix = np.linspace(0,dmax,100)
     pr_mix = np.zeros_like(r)
@@ -108,36 +106,24 @@ if __name__ == "__main__":
     else: 
         print('\n\nERROR: unknown normalization argument: ' + args.normalization + '. Should be "max" or "I0" or "none".\n\n')
         exit()
-    with open(folder + '/pr_%s.dat' % name,'w') as f:
-        f.write('# %-17s %-17s\n' % ('r','p(r)'))
-        for i in range(len(r)):
-            f.write('  %-17.5e %-17.5e\n' % (r[i], pr_mix[i]))
+    save_pr_func(r,pr_mix,folder)
     
     I_mix /= w_sum
     I0_mix /= w_sum
-    with open(folder + '/Iq_%s.dat' % name,'w') as f:
-        f.write('# Theoretical SAS data\n')
-        f.write('# %-12s %-12s\n' % ('q','I'))
-        for i in range(len(q)):
-            f.write('  %-12.5e %-12.5e\n' % (q[i], I_mix[i]))
+    save_I_func(q,I_mix,folder)
 
     ax[0].plot(r,pr_mix,color='black',label='mixture')
     ax[1].plot(q,I_mix,color='black',label='mixture')
 
-    ######################################### Simulate I(q) ##########################################
-    exposure = args.exposure
-    Sim_calc = SimulateScattering(q=q, I0=I0_mix, I=I_mix, exposure=exposure)
-    Isim_mix = getSimulatedScattering(Sim_calc)
-
-    # Save simulated I(q) using IExperimental
-    Isim_class = IExperimental(q=Isim_mix.q, I0=I0_mix, I=I, exposure=exposure)
-    Isim_class.save_Iexperimental(Isim_mix.I_sim, Isim_mix.I_err, folder)
+    #### Simulate I(q) 
+    Isim_mix,sigma_mix = simulate_data_func(q,I_mix,I0_mix,args.exposure)
+    save_Isim_func(q,Isim_mix,sigma_mix,folder)
 
     if args.scale: 
-        ax[2].errorbar(q,Isim_mix.I_sim*scale_factor,yerr=Isim_mix.I_err*scale_factor,linestyle='none',marker='.', color='black',label=r'$I_\mathrm{sim}(q)$, %s, scaled by %1.0e' % ('mixture',scale_factor),zorder=1/zo)
+        ax[2].errorbar(q,Isim_mix*scale_factor,yerr=sigma_mix*scale_factor,linestyle='none',marker='.', color='black',label=r'$I_\mathrm{sim}(q)$, %s, scaled by %1.0e' % ('mixture',scale_factor),zorder=1/zo)
         scale_factor *= 0.1
     else:
-        ax[2].errorbar(q,Isim_mix.I_sim,yerr=Isim_mix.I_err,linestyle='none',marker='.', color='black',label=r'$I_\mathrm{sim}(q)$, %s' % 'mixture',zorder=zo)
+        ax[2].errorbar(q,Isim_mix,yerr=sigma_mix,linestyle='none',marker='.', color='black',label=r'$I_\mathrm{sim}(q)$, %s' % 'mixture',zorder=zo)
 
     ax[0].set_xlabel(r'$r$ [$\mathrm{\AA}$]')
     ax[0].set_ylabel(r'$p(r)$')
@@ -161,9 +147,8 @@ if __name__ == "__main__":
     ax[2].legend(frameon=True)
 
     plt.tight_layout()
-    plt.savefig(folder + '/' + name + '_mixture' + format)
+    plt.savefig(folder + '/' + folder + format)
 
-    
     ### plot sesans data, G(delta), G_sim(delta) - if opted for
     if args.sesans:
 
@@ -196,7 +181,7 @@ if __name__ == "__main__":
             ax[1].legend(frameon=True)
 
         plt.tight_layout()
-        plt.savefig(folder + '/' + name + '_sesans' + format)
+        plt.savefig(folder + '/' + folder + '_sesans' + format)
 
     plt.show()
 

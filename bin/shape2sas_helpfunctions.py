@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.special import gamma,j0
 from typing import Tuple, List, Any
-#from dataclasses import dataclass
 from fast_histogram import histogram1d #histogram1d from fast_histogram is faster than np.histogram (https://pypi.org/project/fast-histogram/) 
 import inspect
 import sys
@@ -17,12 +16,6 @@ def printt(s):
     with open('shape2sas.log','a') as f:
         f.write('%s\n' %s)
 
-################################ Data classes ################################
-
-Vector2D = Tuple[np.ndarray, np.ndarray]
-Vector3D = Tuple[np.ndarray, np.ndarray, np.ndarray]
-Vector4D = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
-
 def sinc(x) -> np.ndarray:
     """
     function for calculating sinc = sin(x)/x
@@ -30,544 +23,520 @@ def sinc(x) -> np.ndarray:
     """
     return np.sinc(x / np.pi)   
 
-### Subunits
+### data classes 
+Vector3D = Tuple[np.ndarray, np.ndarray, np.ndarray]
+Vector4D = Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]
 
-class Sphere:
-    aliases = ["sphere","ball","sph"]
+def calc_all_dist_func(point_distribution):
+    """
+    Calculate unique pairwise distances between 3D points.
+    Returns a 1D float32 array of length N*(N-1)/2.
+    """
+    x_in,y_in,z_in = np.concatenate(point_distribution.x),np.concatenate(point_distribution.y),np.concatenate(point_distribution.z)
+    x = np.array(x_in).astype(np.float32, copy=False)
+    y = np.array(y_in).astype(np.float32, copy=False)
+    z = np.array(z_in).astype(np.float32, copy=False)
+    N = len(x)
 
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 1:
-            printt("\nERROR: subunit sphere needs 1 dimension, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()
-        self.R = dimensions[0]
+    dist = np.empty(N * (N - 1) // 2, dtype=np.float32)
 
-    def getVolume(self) -> float:
-        """Returns the volume of a sphere"""
-        return (4 / 3) * np.pi * self.R**3
+    k = 0
+    for i in range(N - 1):
+        dx = x[i] - x[i+1:]
+        dy = y[i] - y[i+1:]
+        dz = z[i] - z[i+1:]
+        dist[k : k + (N - i - 1)] = np.sqrt(dx*dx + dy*dy + dz*dz)
+        k += N - i - 1
+
+    return dist
+
+def calc_all_contrasts_func(point_distribution):
+    """
+    Calculate unique pairwise contrast products of p.
+    Returns a 1D float32 array of length N*(N-1)/2,
+    matching calc_all_dist().
+    """
+
+    sld_in = np.concatenate(point_distribution.sld)
+    sld = np.array(sld_in).astype(np.float32, copy=False)
+    N = len(sld)
+
+    # Preallocate result array (unique pairs only)
+    contrasts = np.empty(N * (N - 1) // 2, dtype=np.float32)
+
+    # Fill it using triangular indexing without making an (N, N) array
+    k = 0
+    for i in range(N - 1):
+        # multiply p[i] with all following elements at once
+        contrasts[k : k + (N - i - 1)] = sld[i] * sld[i+1:]
+        k += N - i - 1
+
+    return contrasts
     
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a sphere"""
+def generate_histogram_func(dist, prpoints, contrast, r_max):
+    """
+    make histogram of point pairs, h(r), binned after pair-distances, r
+    used for calculating scattering (fast Debye)
 
-        Volume = self.getVolume()
-        Volume_max = (2*self.R)**3 ###Box around sphere.
-        Vratio = Volume_max/Volume
+    input
+    dist     : all pairwise distances
+    prpoints : number of bins in h(r)
+    contrast : contrast of points
+    r_max    : max distance to include in histogram
 
-        N = int(Vratio * Npoints)
-        x = np.random.uniform(-self.R, self.R, N)
-        y = np.random.uniform(-self.R, self.R, N)
-        z = np.random.uniform(-self.R, self.R, N)
-        d = np.sqrt(x**2 + y**2 + z**2)
+    output
+    r        : distances of bins
+    h    : histogram, weighted by contrast
 
-        idx = np.where(d < self.R) #save points inside sphere
-        x_add,y_add,z_add = x[idx], y[idx], z[idx]
+    """
 
-        return x_add, y_add, z_add
+    h, bin_edges = np.histogram(dist, bins=prpoints, weights=contrast, range=(0,r_max)) 
+    r = (bin_edges[:-1] + bin_edges[1:]) * 0.5
 
-    def checkOverlap(self, 
-                     x_eff: np.ndarray, 
-                     y_eff: np.ndarray, 
-                     z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a sphere"""
+    return r, h
+    
+def calc_hr_func(dist, prpoints, contrast, polydispersity):
+    """
+    calculate h(r)
+    h(r) is the contrast-weighted histogram of distances, including self-terms (dist = 0)
 
-        d = np.sqrt(x_eff**2+y_eff**2+z_eff**2)
-        idx = np.where(d > self.R)
-        return idx
+    input: 
+    dist      : all pairwise distances
+    contrast  : all pair-wise contrast products
+    polydispersity: relative polydispersity, float
 
-class HollowSphere:
-    aliases = ["hollowsphere","shell"]
+    output:
+    hr        : pair distance distribution function 
+    """
+    if dist.dtype != np.float32:
+        dist = dist.astype(np.float32, copy=False)
+    if contrast.dtype != np.float32:
+        contrast = contrast.astype(np.float32, copy=False)
 
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 2:
-            printt("\nERROR: subunit hollow_sphere needs 2 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()
-        self.R,self.r = dimensions
+    ## make r range in h(r) histogram slightly larger than dmax
+    ratio_rmax_dmax = 1.05
 
-    def getVolume(self) -> float:
-        """Returns the volume of a hollow sphere"""
-        if self.r > self.R:
-            self.R, self.r = self.r, self.R
-        if self.r == self.R:
-            return 4 * np.pi * self.R**2 #surface area of a sphere
-        else: 
-            return (4 / 3) * np.pi * (self.R**3 - self.r**3)
-
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a hollow sphere"""
-        Volume = self.getVolume()
-        if self.r == self.R:
-            #The hollow sphere is a shell
-            phi = np.random.uniform(0,2 * np.pi, Npoints)
-            costheta = np.random.uniform(-1, 1, Npoints)
-            theta = np.arccos(costheta)
-
-            x_add = self.R * np.sin(theta) * np.cos(phi)
-            y_add = self.R * np.sin(theta) * np.sin(phi)
-            z_add = self.R * np.cos(theta)
-            return x_add, y_add, z_add
-        Volume_max = (2*self.R)**3 ###Box around the sphere
-        Vratio = Volume_max/Volume
-
-        N = int(Vratio * Npoints)
-        x = np.random.uniform(-self.R, self.R, N)
-        y = np.random.uniform(-self.R, self.R, N)
-        z = np.random.uniform(-self.R, self.R, N)
-        d = np.sqrt(x**2 + y**2 + z**2)
-
-        idx = np.where((d < self.R) & (d > self.r))
-        x_add, y_add, z_add = x[idx], y[idx], z[idx]
-        return x_add, y_add, z_add
-
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a hollow sphere"""
-
-        d = np.sqrt(x_eff**2+y_eff**2+z_eff**2)
-        if self.r > self.R:
-             self.r, self.R = self.R, self.r
-        if self.r == self.R:
-            idx = np.where(d != self.R)
-            return idx
+    lognormal = False
+    ## calc h(r) with/without polydispersity
+    if polydispersity > 0.0:
+        if lognormal:
+            dmax = np.amax(dist)*np.exp(3* polydispersity)
         else:
-            idx = np.where((d > self.R) | (d < self.r))
-            return idx
+            dmax = np.amax(dist) * (1 + 3 * polydispersity)
+        r_max = dmax * ratio_rmax_dmax
+        r, hr_1 = generate_histogram_func(dist, prpoints, contrast, r_max)
+        N_poly_integral = 25 # should be uneven to include 1 in factor_range (precalculated)
+        hr  = np.zeros_like(hr_1, dtype=np.float32)
+        #norm = 0.0
+        if lognormal:
+            log_factors = np.linspace(-3*polydispersity, 3*polydispersity, N_poly_integral, dtype=np.float32)
+            factor_range = np.exp(log_factors)
+        else:
+            factor_range = 1 + np.linspace(-3, 3, N_poly_integral, dtype=np.float32) * polydispersity
+        res_range = (1.0 - factor_range) / polydispersity
+        if lognormal:
+            w_range = np.exp(-(np.log(factor_range))**2 / (2*polydispersity**2)) / (factor_range * polydispersity * np.sqrt(2*np.pi))
+        else:
+            w_range = np.exp(-0.5*res_range**2)
+        vol2_range = factor_range**6
+        norm_range = w_range*vol2_range
+        for i,factor_d in enumerate(factor_range):
+            if factor_d == 1.0:
+                hr += hr_1
+                #norm += 1.0
+            else:
+                # calculate in the same bins so histograms can be added
+                dhr = histogram1d(dist * factor_d, bins=prpoints, weights=contrast, range=(0,r_max))
+                hr += dhr * norm_range[i]
+        norm = np.sum(norm_range)
+        hr /= norm
+    else:
+        dmax = np.amax(dist)
+        r_max = dmax * ratio_rmax_dmax
+        r, hr = generate_histogram_func(dist, prpoints, contrast, r_max)
 
-class Cylinder:
-    aliases = ["cylinder","disc","rod","cyl"]
+    return r, hr, dmax
 
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 2:
-            printt("\nERROR: subunit cylinder needs 2 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()        
-        self.R,self.l = dimensions
+def calc_Rg_func(r, pr):
+    """ 
+    calculate Rg from r and p(r)
+    """
+    sum_pr_r2 = np.sum(pr * r**2)
+    sum_pr = np.sum(pr)
+    Rg = np.sqrt(abs(sum_pr_r2 / sum_pr) / 2)
 
-    def getVolume(self) -> float:
-        """Returns the volume of a cylinder"""
-
-        return np.pi * self.R**2 * self.l
+    return Rg
     
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a cylinder"""
+def calc_pr_func(point_distribution,prpoints=100,polydispersity=0):
+    """
+    calculate p(r)
+    p(r) is the contrast-weighted histogram of distances, without the self-terms (dist = 0)
 
-        Volume = self.getVolume()
-        Volume_max = 2 * self.R * 2 * self.R * self.l
-        Vratio = Volume_max / Volume
+    input: 
+    dist      : all pairwise distances
+    contrast  : all pair-wise contrast products
+    polydispersity: boolian, True or False
 
-        N = int(Vratio * Npoints)
-        x = np.random.uniform(-self.R, self.R, N)
-        y = np.random.uniform(-self.R, self.R, N)
-        z = np.random.uniform(-self.l / 2, self.l / 2, N)
-        d = np.sqrt(x**2 + y**2)
-        idx = np.where(d < self.R)
-        x_add,y_add,z_add = x[idx],y[idx],z[idx]
+    output:
+    pr        : pair distance distribution function
+    """
+    printt('        calculating distances...')
+    dist = calc_all_dist_func(point_distribution)
+    printt('        calculating contrasts...')
+    contrast = calc_all_contrasts_func(point_distribution)
 
-        return x_add, y_add, z_add
+    ## calculate pr
+    printt('        calculating p(r)...')
+    r, pr, dmax = calc_hr_func(dist, prpoints, contrast, polydispersity)
+    printt(f"           dmax: {dmax:.3e} A")
 
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a cylinder"""
+    ## normalize so pr_max = 1
+    pr_norm = pr / np.amax(pr)
 
-        d = np.sqrt(x_eff**2+y_eff**2)
-        idx = np.where((d > self.R) | (abs(z_eff) > self.l / 2))
-        return idx
+    ## calculate Rg
+    Rg = calc_Rg_func(r, pr_norm)
+    printt(f"           Rg  : {Rg:.3e} A")
 
-class Ellipsoid:
-    aliases = ["ellipsoid","ellips"]
+    #returned N values after generating
+    pr /= len(point_distribution.x)**2 #NOTE: N_total**2
 
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 3:
-            printt("\nERROR: subunit ellipsoid needs 3 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()    
-        self.a,self.b,self.c = dimensions
+    return r, pr, pr_norm, dmax
 
-    def getVolume(self) -> float:
-        """Returns the volume of an ellipsoid"""
-        return (4 / 3) * np.pi * self.a * self.b * self.c
+def calc_Pq_func(q, r, pr, conc, volume_total):
+    """
+    calculate form factor, P(q), and forward scattering, I(0), using pair distribution, p(r) 
+    """
+    ## calculate P(q) and I(0) from p(r)
+    I0, Pq = 0, 0
+    for (r_i, pr_i) in zip(r, pr):
+        I0 += pr_i
+        qr = q * r_i
+        Pq += pr_i * sinc(qr)
 
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of an ellipsoid"""
-        Volume = self.getVolume()
-        Volume_max = 2 * self.a * 2 * self.b * 2 * self.c
-        Vratio = Volume_max / Volume
+    # normalization, P(0) = 1
+    if I0 == 0:
+        I0 = 1E-5
+    elif I0 < 0:
+        I0 = abs(I0)
+    Pq /= I0
 
-        N = int(Vratio * Npoints)
-        x = np.random.uniform(-self.a, self.a, N)
-        y = np.random.uniform(-self.b, self.b, N)
-        z = np.random.uniform(-self.c, self.c, N)
+    # make I0 scale with volume fraction (concentration) and 
+    # volume squared and scale so default values gives I(0) of approx unity
+    I0 *= conc * volume_total * 1E-4
+    return I0, Pq
 
-        d2 = x**2 / self.a**2 + y**2 / self.b**2 + z**2 / self.c**2
-        idx = np.where(d2 < 1)
-        x_add, y_add, z_add = x[idx], y[idx], z[idx]
+def calc_Iq_func(q, Pq, S_eff, sigma_r):
+    """
+    calculates intensity
+    """
 
-        return x_add, y_add, z_add
+    ## multiply form factor with structure factor
+    I = Pq * S_eff
 
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """check for points within a ellipsoid"""
+    ## interface roughness (Skar-Gislinge et al. 2011, DOI: 10.1039/c0cp01074j)
+    if sigma_r > 0.0:
+        roughness = np.exp(-(q * sigma_r)**2 / 2)
+        I *= roughness
 
-        d2 = x_eff**2 / self.a**2 + y_eff**2 / self.b**2 + z_eff**2 / self.c**2
-        idx = np.where(d2 > 1)
-
-        return idx
-
-class EllipticalCylinder:
-    aliases = ["ellipticalcylinder","ellipticalrod"]
-
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 3:
-            printt("\nERROR: subunit elliptical_cylinder needs 3 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()  
-        self.a,self.b,self.l = dimensions
-
-    def getVolume(self) -> float:
-        """Returns the volume of an elliptical cylinder"""
-        return np.pi * self.a * self.b * self.l
-
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of an elliptical cylinder"""
-
-        Volume = self.getVolume()
-        Volume_max = 2 * self.a * 2 * self.b * self.l
-        Vratio = Volume_max / Volume
-
-        N = int(Vratio * Npoints)
-        x = np.random.uniform(-self.a, self.a, N)
-        y = np.random.uniform(-self.b, self.b, N)
-        z = np.random.uniform(-self.l / 2, self.l / 2, N)
-
-        d2 = x**2 / self.a**2 + y**2 / self.b**2
-        idx = np.where(d2 < 1)
-        x_add, y_add, z_add = x[idx], y[idx], z[idx]
-
-        return x_add, y_add, z_add 
-
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a Elliptical cylinder"""
-        d2 = x_eff**2 / self.a**2 + y_eff**2 / self.b**2
-        idx = np.where((d2 > 1) | (abs(z_eff) > self.l / 2))
-        return idx
-
-class Cube:
-    aliases = ["cube","dice"]
-
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 1:
-            printt("\nERROR: subunit cube needs 1 dimension, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()  
-        self.a = dimensions[0]
-
-    def getVolume(self) -> float:
-        """Returns the volume of a cube"""
-        return self.a**3
-
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a cube"""
-
-        Volume = self.getVolume()
-
-        N = Npoints
-        x_add = np.random.uniform(-self.a, self.a, N)
-        y_add = np.random.uniform(-self.a, self.a, N)
-        z_add = np.random.uniform(-self.a, self.a, N)
-
-        return x_add, y_add, z_add
-
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a cube"""
-
-        idx = np.where((abs(x_eff) >= self.a/2) | (abs(y_eff) >= self.a/2) | 
-            (abs(z_eff) >= self.a/2) | ((abs(x_eff) <= self.b/2) 
-            & (abs(y_eff) <= self.b/2) & (abs(z_eff) <= self.b/2)))
-        
-        return idx
-
-class HollowCube:
-    aliases = ["hollowcube","hollowdice"]
-
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 2:
-            printt("\nERROR: subunit hollow_cube needs 2 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()  
-        self.a,self.b = dimensions
-
-    def getVolume(self) -> float:
-        """Returns the volume of a hollow cube"""
-        if self.a < self.b:
-            self.a, self.b = self.b, self.a
-        if self.a == self.b:
-            return 6 * self.a**2 #surface area of a cube
-        else: 
-            return self.a**3 - self.b**3
+    return I
     
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a hollow cube"""
+def calc_com_dist_func(point_distribution):
+    """ 
+    calc contrast-weighted com distance
+    """
+    w = np.abs(point_distribution.sld)
 
-        Volume = self.getVolume()
-        
-        if self.a == self.b:
-            #The hollow cube is a shell
-            d = self.a / 2
-            N = int(Npoints / 6)
-            one = np.ones(N)
-            
-            #make each side of the cube at a time
-            x_add, y_add, z_add = [], [], []
-            for sign in [-1, 1]:
-                x_add = np.concatenate((x_add, sign * one * d))
-                y_add = np.concatenate((y_add, np.random.uniform(-d, d, N)))
-                z_add = np.concatenate((z_add, np.random.uniform(-d, d, N)))
-                
-                x_add = np.concatenate((x_add, np.random.uniform(-d, d, N)))
-                y_add = np.concatenate((y_add, sign * one * d))
-                z_add = np.concatenate((z_add, np.random.uniform(-d, d, N)))
+    if np.sum(w) == 0:
+        w = np.ones(len(point_distribution.x))
 
-                x_add = np.concatenate((x_add, np.random.uniform(-d, d, N)))
-                y_add = np.concatenate((y_add, np.random.uniform(-d, d, N)))
-                z_add = np.concatenate((z_add, sign * one * d))
-            return x_add, y_add, z_add
-        
-        Volume_max = self.a**3
-        Vratio = Volume_max / Volume
-        N = int(Vratio * Npoints)
+    x_com, y_com, z_com = np.average(point_distribution.x, weights=w), np.average(point_distribution.y, weights=w), np.average(point_distribution.z, weights=w)
+    dx, dy, dz = point_distribution.x - x_com, point_distribution.y - y_com, point_distribution.z - z_com
+    com_dist = np.sqrt(dx**2 + dy**2 + dz**2)
 
-        x = np.random.uniform(-self.a / 2,self.a / 2, N)
-        y = np.random.uniform(-self.a / 2,self.a / 2, N)
-        z = np.random.uniform(-self.a / 2,self.a / 2, N)
+    return com_dist
 
-        d = np.maximum.reduce([abs(x), abs(y), abs(z)])
-        idx = np.where(d >= self.b / 2)
-        x_add,y_add,z_add = x[idx], y[idx], z[idx]
+def calc_A00_func(q,point_distribution):
+    """
+    calc zeroth order sph harm, for decoupling approximation
+    """
+    d_in = np.concatenate(calc_com_dist_func(point_distribution))
+    d = np.array(d_in).astype(np.float32, copy=False)
+    M = len(q)
+    A00 = np.zeros(M)
+    sld_in = np.concatenate(point_distribution.sld)
+    sld = np.array(sld_in).astype(np.float32, copy=False)
+    for i in range(M):
+        qr = q[i] * d
+        A00[i] = sum(sld * sinc(qr))
+    A00 = A00 / A00[0] # normalise, A00[0] = 1
 
-        return x_add, y_add, z_add
+    return A00
 
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a hollow cube"""
+def decoupling_approx_func(q,point_distribution, Pq, S):
+    """
+    modify structure factor with the decoupling approximation
+    for combining structure factors with non-spherical (or polydisperse) particles
 
-        if self.a < self.b:
-            self.a, self.b = self.b, self.a
-        
-        if self.a == self.b:
-            idx = np.where((abs(x_eff)!=self.a/2) | (abs(y_eff)!=self.a/2) | (abs(z_eff)!=self.a/2))
-            return idx
-        
-        else: 
-            idx = np.where((abs(x_eff) >= self.a/2) | (abs(y_eff) >= self.a/2) | 
-            (abs(z_eff) >= self.a/2) | ((abs(x_eff) <= self.b/2) 
-            & (abs(y_eff) <= self.b/2) & (abs(z_eff) <= self.b/2)))
+    see, for example, Larsen et al 2020: https://doi.org/10.1107/S1600576720006500
+    and refs therein
 
-        return idx
+    input
+    q
+    x,y,z,p    : coordinates and contrasts
+    Pq         : form factor
+    S          : structure factor
 
-class Cuboid:
-    aliases = ["cuboid","brick"]
+    output
+    S_eff      : effective structure factor, after applying decoupl. approx
+    """
+    A00 = calc_A00_func(q,point_distribution)
+    const = 1e-3 # add constant in nominator and denominator, for stability (numerical errors for small values dampened)
+    Beta = (A00**2 + const) / (Pq + const)
+    S_eff = 1 + Beta * (S - 1)
+    return S_eff
 
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 3:
-            printt("\nERROR: subunit hollow_cube needs 3 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
+def calc_S_HS_func(q,conc,R_HS):
+    """
+    Calculate the hard-sphere structure factor using the Percus-Yevick approximation.
+    Implements the stable version with Taylor expansion for small A = 2*R*q.
+    adapted directly from the sasview code
+    """
+
+    if conc <= 0.0:
+        return np.ones(len(q))
+
+    vf = conc
+    R = R_HS
+    X = np.abs(2.0 * R * q)  # same as A in your earlier code
+
+    # Precompute constants
+    denom = (1.0 - vf)
+    if denom < 1e-12:  # avoid division by zero
+        return np.ones_like(q)
+
+    Xinv = 1.0 / denom
+    D = Xinv * Xinv
+    A = (1.0 + 2.0 * vf) * D
+    A *= A
+    B = (1.0 + 0.5 * vf) * D
+    B *= B
+    B *= -6.0 * vf
+    G = 0.5 * vf * A
+
+    # Cutoffs
+    cutoff_tiny = 5e-6
+    cutoff_series = 0.05  # corresponds to CUTOFFHS in C code
+
+    S_HS = np.empty_like(q)
+
+    for i, x in enumerate(X):
+        if x < cutoff_tiny:
+            # limit q -> 0
+            S_HS[i] = 1.0 / A
+        elif x < cutoff_series:
+            # Taylor series expansion
+            x2 = x * x
+            # Equivalent to the FF expression in the C code
+            FF = (8.0 * A + 6.0 * B + 4.0 * G
+                + (-0.8 * A - B / 1.5 - 0.5 * G
+                    + (A / 35.0 + 0.0125 * B + 0.02 * G) * x2) * x2)
+            S_HS[i] = 1.0 / (1.0 + vf * FF)
+        else:
+            # Normal expression
+            x2 = x * x
+            x4 = x2 * x2
+            s, c = np.sin(x), np.cos(x)
+            # FF expression refactored from the C code
+            FF = ((G * ((4.0 * x2 - 24.0) * x * s
+                        - (x4 - 12.0 * x2 + 24.0) * c
+                        + 24.0) / x2
+                + B * (2.0 * x * s - (x2 - 2.0) * c - 2.0)) / x
+                + A * (s - x * c)) / x
+            S_HS[i] = 1.0 / (1.0 + 24.0 * vf * FF / x2)
+
+    return S_HS
+
+def calc_S_aggr_func(q,Reff,Naggr):
+    """
+    calculates fractal aggregate structure factor with dimensionality 2
+
+    S_{2,D=2} in Larsen et al 2020, https://doi.org/10.1107/S1600576720006500
+
+    input 
+    q      :
+    Naggr  : number of particles per aggregate
+    Reff   : effective radius of one particle 
+
+    output
+    S_aggr :
+    """
+    qR = q * Reff
+    S_aggr = 1 + (Naggr - 1)/(1 + qR**2 * Naggr / 3)
+    return S_aggr
+
+def structure_eff(self, Pq: np.ndarray) -> np.ndarray:
+    """Return effective structure factor for aggregation"""
+
+    S = self.calc_S_aggr()
+    S_eff = self.decoupling_approx(Pq, S)
+    S_eff = (1 - self.fracs_aggr) + self.fracs_aggr * S_eff
+    return S_eff
+
+def check_Spar(stype,S_par,n):
+    if len(S_par) != n:
+            if n == 1:
+                printt("\nERROR: structure factor " + stype + " needs " + str(n) + " parameter (provided after --S_par or -Sp), but " + str(len(S_par)) + ' parameters were given: ' + str(S_par) + '\n')
+            else:
+                printt("\nERROR: structure factor " + stype + " needs " + str(n) + " parameters (provided after --S_par or -Sp), but " + str(len(S_par)) + ' parameters were given: ' + str(S_par) + '\n')
             exit()
-        self.a,self.b,self.c = dimensions
 
-    def getVolume(self) -> float:
-        """Returns the volume of a cuboid"""
-        return self.a * self.b * self.c
+def calc_S_func(q,point_distribution,stype,S_par,Pq):
+    aliasses_HS = ['hardsphere','hs','hard-sphere']
+    aliasses_aggr = ['aggregation','aggr','aggregate','frac2d']
+
+    if stype in aliasses_HS:
+        check_Spar(stype,S_par,2)
+        conc,R_HS = S_par
+        S = calc_S_HS_func(q,conc,R_HS)
+        S_eff = decoupling_approx_func(q,point_distribution,Pq, S)
+    elif stype in aliasses_aggr:
+        check_Spar(stype,S_par,3)
+        Reff,Naggr,fracs_aggr = S_par
+        S = calc_S_aggr_func(q,Reff,Naggr)
+        S_eff = decoupling_approx_func(q,point_distribution,Pq, S)
+        S_eff = (1 - fracs_aggr) + fracs_aggr * S_eff
+    else:
+        S_eff = np.ones_like(q)
     
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a cuboid"""
-        Volume = self.getVolume()
-        x_add = np.random.uniform(-self.a, self.a, Npoints)
-        y_add = np.random.uniform(-self.b, self.b, Npoints)
-        z_add = np.random.uniform(-self.c, self.c, Npoints)
-        return x_add, y_add, z_add
-    
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a Cuboid"""
-        idx = np.where((abs(x_eff) >= self.a/2) 
-        | (abs(y_eff) >= self.b/2) | (abs(z_eff) >= self.c/2))
-        return idx
+    return S_eff
 
-class CylinderRing:
-    aliases = ["cylinderring","ring","cylring","discring","hollowcylinder","hollowdisc","hollowrod"]
+def simulate_data_func(q,I,I0,exposure):
+    """
+    Simulate SAXS data using calculated scattering and empirical expression for sigma
+    using Sedlak et al, 2017: (https://doi.org/10.1107/S1600576717003077)
 
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 3:
-            printt("\nERROR: subunit CylinderRing needs 3 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()
-        self.R,self.r,self.l = dimensions
-    
-    def getVolume(self) -> float:
-        """Returns the volume of a cylinder ring"""
-        if self.r > self.R:
-            self.R, self.r = self.r, self.R
-        if self.r == self.R:
-            return 2 * np.pi * self.R * self.l #surface area of a cylinder
-        else: 
-            return np.pi * (self.R**2 - self.r**2) * self.l
+    input
+    q,I      : calculated scattering, normalized
+    I0       : forward scattering
+    exposure : exposure (in arbitrary units) - affects the noise level of data
 
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a cylinder ring"""
-        Volume = self.getVolume()
-        if self.r == self.R:
-            #The cylinder ring is a shell
-            phi = np.random.uniform(0, 2 * np.pi, Npoints)
-            x_add = self.R * np.cos(phi)
-            y_add = self.R * np.sin(phi)
-            z_add = np.random.uniform(-self.l / 2, self.l / 2, Npoints)
-            return x_add, y_add, z_add
-        Volume_max = 2 * self.R * 2 * self.R * self.l
-        Vratio = Volume_max / Volume
-        N = int(Vratio * Npoints)
-        x = np.random.uniform(-self.R, self.R, N)
-        y = np.random.uniform(-self.R, self.R, N)
-        z = np.random.uniform(-self.l / 2, self.l / 2, N)
-        d = np.sqrt(x**2 + y**2)
-        idx = np.where((d < self.R) & (d > self.r))
-        x_add, y_add, z_add = x[idx], y[idx], z[idx]
-        return x_add, y_add, z_add
+    output
+    sigma    : simulated noise
+    Isim     : simulated data
 
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a cylinder ring"""
-        d = np.sqrt(x_eff**2 + y_eff**2)
-        if self.r > self.R:
-            self.R, self.r = self.r, self.R
-        if self.r == self.R:
-            idx = np.where((d != self.R) | (abs(z_eff) > self.l / 2))
-            return idx
-        else: 
-            idx = np.where((d > self.R) | (d < self.r) | (abs(z_eff) > self.l / 2))
-            return idx
+    data is also written to a file
+    """
 
-class Torus:
-    aliases = ["torus","toroid","doughnut"]
+    # set constants
+    k = 4500
+    c = 0.85
 
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 2:
-            printt("\nERROR: subunit Torus needs 2 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()
-        self.R,self.r = dimensions
+    # convert from intensity units to counts
+    I_sed = exposure * I0 * I
 
-    def getVolume(self) -> float:
-        """Returns the volume of a torus"""
+    # make N
+    N = k * q # original expression from Sedlak2017 paper
 
-        return 2 * np.pi**2 * self.r**2 * self.R
+    qt = 1.4 # threshold - above this q value, the linear expression do not hold
+    a = 3.0 # empirical constant 
+    b = 0.6 # empirical constant
+    idx = np.where(q > qt)
+    N[idx] = k * qt * np.exp(-0.5 * ((q[idx] - qt) / b)**a)
 
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a torus"""
-        Volume = self.getVolume()
-        L = 2 * (self.R + self.r)
-        l = 2 * self.r
-        Volume_max = L*L*l
-        Vratio = Volume_max / Volume
-        N = int(Vratio * Npoints)
-        x = np.random.uniform(-L/2, L/2, N)
-        y = np.random.uniform(-L/2, L/2, N)
-        z = np.random.uniform(-l/2, l/ 2, N)
-        # equation: (R-sqrt(x**2+y**2))**2 + z**2 = (R-d)**2 + z**2 = r
-        d = np.sqrt(x**2 + y**2)
-        idx = np.where((self.R-d)**2 + z**2 < self.r**2)
-        x_add, y_add, z_add = x[idx], y[idx], z[idx]
+    # make I(q_arb)
+    q_max = np.amax(q)
+    q_arb = 0.3
+    if q_max <= q_arb:
+        I_sed_arb = I_sed[-2]
+    else: 
+        idx_arb = np.where(q > q_arb)[0][0]
+        I_sed_arb = I_sed[idx_arb]
 
-        return x_add, y_add, z_add
+    # calc variance and sigma
+    v_sed = (I_sed + 2 * c * I_sed_arb / (1 - c)) / N
+    sigma_sed = np.sqrt(v_sed)
 
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a torus"""
-        d = np.sqrt(x_eff**2 + y_eff**2)
-        idx = np.where((self.R-d)**2 + z_eff**2 > self.r**2)
-        return idx
-        
-class Hyperboloid:
-    aliases = ["hyperboloid", "hourglass", "coolingtower"]
-    
-    # https://mathworld.wolfram.com/One-SheetedHyperboloid.html
-    # https://www.vcalc.com/wiki/hyperboloid-volume
+    # rescale
+    sigma = sigma_sed / exposure
 
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 3:
-            printt("\nERROR: subunit Hyperboloid needs 3 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()
-        self.r,self.c,self,h = dimensions
+    ## simulate data using errors
+    mu = I0 * I
+    Isim = np.random.normal(mu, sigma)
 
-    def getVolume(self) -> float:
-        """Returns the volume of a hyperboloid"""
-        return np.pi * 2*self.h * self.r**2 * ( 1 + (2*self.h)**2 / ( 12 * self.c**2 ) )
+    return Isim, sigma
 
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a hyperboloid"""
-        #Volume = self.getVolume()
-        L = 2 * self.h
-        R = self.r * np.sqrt( 1 + L**2 / (4 * self.c**2 ) )
-        Volume_max = 2*self.h * 2*R * 2*R
-        Volume = np.pi * L * ( 2 * self.r**2 + R**2 ) / 3
-        Vratio = Volume_max / Volume
-        N = int(Vratio * Npoints)
-        x = np.random.uniform(-R, R, N)
-        y = np.random.uniform(-R, R, N)
-        z = np.random.uniform(-self.h, self.h, N)
-        idx = np.where(x**2/self.r**2 + y**2/self.r**2 - z**2/self.c**2 < 1.0)
-        x_add, y_add, z_add = x[idx], y[idx], z[idx]
-        return x_add, y_add, z_add
+def simulate_sesans(delta,G,error):
+    """
+    Simulate SESANS data using calculated scattering and estimate for sigma
 
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a Hyperboloid"""
-        idx = np.where(x_eff**2/self.r**2 + y_eff**2/self.r**2 - z_eff**2/self.c**2 > 1.0)
-        return idx
-    
-class Superellipsoid:
-    aliases = ["superellipsoid"]
+    input
+    delta, G: spin-echo lengths and theoretical G(delta)
+    error: relative error
 
-    def __init__(self, dimensions: List[float]):
-        if len(dimensions) != 4:
-            printt("\nERROR: subunit Superellipsoid needs 4 dimensions, but " + str(len(dimensions)) + ' dimensions were given: ' + str(dimensions) + '\n')
-            exit()
-        self.R,self.eps,self.t,self.s = dimensions
+    output
+    sesans_sigma: simulated errors
+    lnPsim: simulated data
 
-    @staticmethod
-    def beta(a, b) -> float:
-        """beta function"""
-        return gamma(a) * gamma(b) / gamma(a + b)
+    """
+    # Compute baseline noise as sesans_noise % of min(G-G(0))
+    noise_baseline = error * np.abs(np.min(G - G[0]))
+    # Compute delta-dependent noise as function of baseline noise
+    m = 1/50000 # 1/50000 adds a baseline worth of noise per 5 micrometers of additional spin echo length (delta)
+    d_delta = delta[-1] - delta[0]
+    sesans_sigma = np.linspace(noise_baseline, noise_baseline * (1 + m * d_delta), len(delta))
+    # pick random points using mean and sigma
+    lnPsim = np.random.normal((G - G[0]), sesans_sigma)
+    return lnPsim,sesans_sigma
 
-    def getVolume(self) -> float:
-        """Returns the volume of a superellipsoid"""
-        return (8 / (3 * self.t * self.s) * self.R**3 * self.eps * 
-                self.beta(1 / self.s, 1 / self.s) * self.beta(2 / self.t, 1 / self.t))
-    
-    def getPointDistribution(self, Npoints: int) -> Vector3D:
-        """Returns the point distribution of a superellipsoid"""
-        Volume = self.getVolume()
-        Volume_max = 2 * self.R * self.eps * 2 * self.R * 2 * self.R
-        Vratio = Volume_max / Volume
-        N = int(Vratio * Npoints)
-        x = np.random.uniform(-self.R, self.R, N)
-        y = np.random.uniform(-self.R, self.R, N)
-        z = np.random.uniform(-self.R * self.eps, self.R * self.eps, N)
-        d = ((np.abs(x)**self.s + np.abs(y)**self.s)**(self.t/ self.s) 
-            + np.abs(z / self.eps)**self.t)
-        idx = np.where(d < np.abs(self.R)**self.t)
-        x_add, y_add, z_add = x[idx], y[idx], z[idx]
-        return x_add, y_add, z_add
-    
-    def checkOverlap(self, x_eff: np.ndarray, 
-                           y_eff: np.ndarray, 
-                           z_eff: np.ndarray) -> np.ndarray:
-        """Check for points within a superellipsoid"""
-        d = ((np.abs(x_eff)**self.s + np.abs(y_eff)**self.s)**(self.t / self.s) 
-        + np.abs(z_eff / self.eps)**self.t)
-        idx = np.where(d >= np.abs(self.R)**self.t)
-        return idx
+def save_points(point_distribution,model_filename):
+    """save point cloud to a file"""
+    os.makedirs(model_filename, exist_ok=True)  
+    x,y,z,sld = np.concatenate(point_distribution.x), np.concatenate(point_distribution.y), np.concatenate(point_distribution.z), np.concatenate(point_distribution.sld)
+    with open('%s/points_%s.txt' % (model_filename,model_filename),'w') as f:
+        f.write('# x y z sld\n')
+        for xi,yi,zi,s in zip(x,y,z,sld):
+            f.write('%f %f %f %f\n' % (xi,yi,zi,s))
+
+def save_pr_func(r,pr,model_filename):
+    """save pair distance distribution p(r)"""
+
+    os.makedirs(model_filename, exist_ok=True)  
+    with open('%s/pr_%s.dat' % (model_filename,model_filename),'w') as f:
+        #f.write('# Pair distance distribution function (PDDF) p(r)\n')
+        f.write('# %-12s %-12s\n' % ('r','p(r)'))
+        for r_i,pr_i in zip(r,pr):
+            f.write('  %-12.5e %-12.5e\n' % (r_i, pr_i))
+
+def save_S_func(q, S, model_filename):
+    """Save structure factor to file"""
+
+    os.makedirs(model_filename, exist_ok=True)  
+    with open('%s/Sq_%s.dat' % (model_filename,model_filename),'w') as f:
+        f.write('# Structure factor SAS data\n')
+        f.write('# %-12s %-12s\n' % ('q','S'))
+        for qi,Si in zip(q,S):
+            f.write('  %-12.5e %-12.5e\n' % (qi, Si))
+
+def save_I_func(q, I, model_filename):
+    """Save theoretical intensity to file"""
+
+    os.makedirs(model_filename, exist_ok=True)  
+    with open('%s/Iq_%s.dat' % (model_filename,model_filename),'w') as f:
+        f.write('# Theoretical SAS data\n')
+        f.write('# %-12s %-12s\n' % ('q','I'))
+        for qi,Ii in zip(q,I):
+            f.write('  %-12.5e %-12.5e\n' % (qi, Ii))
+
+def save_Isim_func(q, I_sim, sigma, model_filename):
+    """Save theoretical intensity to file"""
+
+    os.makedirs(model_filename, exist_ok=True)  
+    with open('%s/Isim_%s.dat' % (model_filename,model_filename),'w') as f:
+        f.write('# Simulated SAXS data with noise\n')
+        f.write('# sigma generated using Sedlak et al, k=100000, c=0.55, https://doi.org/10.1107/S1600576717003077, and rebinned with 10 per bin)\n')
+        f.write('# %-12s %-12s %-12s\n' % ('q','I','sigma'))
+        for q_i,Isim_i,sigma_i in zip(q,I_sim,sigma):
+                f.write('  %-12.5e %-12.5e %-12.5e\n' % (q_i, Isim_i, sigma_i))
 
 def Rotate(x,y,z,alpha,beta,gamma):
     """
@@ -800,670 +769,7 @@ class GenerateAllPoints:
 
         return x_new, y_new, z_new, sld_new, volume_total
 
-class WeightedPairDistribution:
-    def __init__(self, x: np.ndarray, 
-                       y: np.ndarray, 
-                       z: np.ndarray, 
-                       sld: np.ndarray):
-        self.x = x
-        self.y = y
-        self.z = z
-        self.sld = sld #contrast
-    
-    def calc_all_dist(self) -> np.ndarray:
-        """
-        Calculate unique pairwise distances between 3D points.
-        Returns a 1D float32 array of length N*(N-1)/2.
-        """
-        x = self.x.astype(np.float32, copy=False)
-        y = self.y.astype(np.float32, copy=False)
-        z = self.z.astype(np.float32, copy=False)
-        N = len(x)
-
-        out = np.empty(N * (N - 1) // 2, dtype=np.float32)
-
-        k = 0
-        for i in range(N - 1):
-            dx = x[i] - x[i+1:]
-            dy = y[i] - y[i+1:]
-            dz = z[i] - z[i+1:]
-            out[k : k + (N - i - 1)] = np.sqrt(dx*dx + dy*dy + dz*dz)
-            k += N - i - 1
-
-        return out
-    
-    def calc_all_contrasts(self) -> np.ndarray:
-        """
-        Calculate unique pairwise contrast products of p.
-        Returns a 1D float32 array of length N*(N-1)/2,
-        matching calc_all_dist().
-        """
-        sld = self.sld.astype(np.float32, copy=False)
-        N = len(sld)
-
-        # Preallocate result array (unique pairs only)
-        out = np.empty(N * (N - 1) // 2, dtype=np.float32)
-
-        # Fill it using triangular indexing without making an (N, N) array
-        k = 0
-        for i in range(N - 1):
-            # multiply p[i] with all following elements at once
-            out[k : k + (N - i - 1)] = sld[i] * sld[i+1:]
-            k += N - i - 1
-
-        return out
-
-    @staticmethod
-    def generate_histogram(dist: np.ndarray, Nbins: int, contrast: np.ndarray, r_max: float) -> Vector2D:
-        """
-        make histogram of point pairs, h(r), binned after pair-distances, r
-        used for calculating scattering (fast Debye)
-
-        input
-        dist     : all pairwise distances
-        Nbins    : number of bins in h(r)
-        contrast : contrast of points
-        r_max    : max distance to include in histogram
-
-        output
-        r        : distances of bins
-        h    : histogram, weighted by contrast
-
-        """
-
-        h, bin_edges = np.histogram(dist, bins=Nbins, weights=contrast, range=(0,r_max)) 
-        r = (bin_edges[:-1] + bin_edges[1:]) * 0.5
-
-        return r, h
-    
-    @staticmethod
-    def calc_Rg(r: np.ndarray, pr: np.ndarray) -> float:
-        """ 
-        calculate Rg from r and p(r)
-        """
-        sum_pr_r2 = np.sum(pr * r**2)
-        sum_pr = np.sum(pr)
-        Rg = np.sqrt(abs(sum_pr_r2 / sum_pr) / 2)
-
-        return Rg
-
-    def calc_hr(self, 
-                dist: np.ndarray, 
-                Nbins: int, 
-                contrast: np.ndarray, 
-                polydispersity: float) -> Vector2D:
-        """
-        calculate h(r)
-        h(r) is the contrast-weighted histogram of distances, including self-terms (dist = 0)
-
-        input: 
-        dist      : all pairwise distances
-        contrast  : all pair-wise contrast products
-        polydispersity: relative polydispersity, float
-
-        output:
-        hr        : pair distance distribution function 
-        """
-    
-        if dist.dtype != np.float32:
-            dist = dist.astype(np.float32, copy=False)
-        if contrast.dtype != np.float32:
-            contrast = contrast.astype(np.float32, copy=False)
-
-        ## make r range in h(r) histogram slightly larger than Dmax
-        ratio_rmax_dmax = 1.05
-
-        lognormal = False
-        ## calc h(r) with/without polydispersity
-        if polydispersity > 0.0:
-            if lognormal:
-                Dmax = np.amax(dist)*np.exp(3* polydispersity)
-            else:
-                Dmax = np.amax(dist) * (1 + 3 * polydispersity)
-            r_max = Dmax * ratio_rmax_dmax
-            r, hr_1 = self.generate_histogram(dist, Nbins, contrast, r_max)
-            N_poly_integral = 25 # should be uneven to include 1 in factor_range (precalculated)
-            hr  = np.zeros_like(hr_1, dtype=np.float32)
-            #norm = 0.0
-            if lognormal:
-                log_factors = np.linspace(-3*polydispersity, 3*polydispersity, N_poly_integral, dtype=np.float32)
-                factor_range = np.exp(log_factors)
-            else:
-                factor_range = 1 + np.linspace(-3, 3, N_poly_integral, dtype=np.float32) * polydispersity
-            res_range = (1.0 - factor_range) / polydispersity
-            if lognormal:
-                w_range = np.exp(-(np.log(factor_range))**2 / (2*polydispersity**2)) / (factor_range * polydispersity * np.sqrt(2*np.pi))
-            else:
-                w_range = np.exp(-0.5*res_range**2)
-            vol2_range = factor_range**6
-            norm_range = w_range*vol2_range
-            for i,factor_d in enumerate(factor_range):
-                if factor_d == 1.0:
-                    hr += hr_1
-                    #norm += 1.0
-                else:
-                    # calculate in the same bins so histograms can be added
-                    dhr = histogram1d(dist * factor_d, bins=Nbins, weights=contrast, range=(0,r_max))
-                    #res = (1.0 - factor_d) / polydispersity
-                    #w = np.exp(-res**2 / 2.0) # weight: normal distribution
-                    #vol2 = (factor_d**3)**2 # weight: relative volumen squared, because larger particles scatter more
-                    #dnorm = w * vol2
-                    #norm += dnorm
-                    #hr += dhr * dnorm
-                    hr += dhr * norm_range[i]
-            norm = np.sum(norm_range)
-            hr /= norm
-        else:
-            Dmax = np.amax(dist)
-            r_max = Dmax * ratio_rmax_dmax
-            r, hr = self.generate_histogram(dist, Nbins, contrast, r_max)
-
-        # print Dmax
-        printt(f"        Dmax: {Dmax:.3e} A")
-
-        return r, hr
-
-    def calc_pr(self, Nbins: int, polydispersity: float) -> Vector3D:
-        """
-        calculate p(r)
-        p(r) is the contrast-weighted histogram of distances, without the self-terms (dist = 0)
-
-        input: 
-        dist      : all pairwise distances
-        contrast  : all pair-wise contrast products
-        polydispersity: boolian, True or False
-
-        output:
-        pr        : pair distance distribution function
-        """
-        printt('        calculating distances...')
-        dist = self.calc_all_dist()
-        printt('        calculating contrasts...')
-        contrast = self.calc_all_contrasts()
-
-        ## calculate pr
-        #idx_nonzero = np.where(dist > 0.0) #  nonzero elements
-        #r, pr = self.calc_hr(dist[idx_nonzero], Nbins, contrast[idx_nonzero], polydispersity)
-        printt('        calculating pr...')
-        r, pr = self.calc_hr(dist, Nbins, contrast, polydispersity)
-
-        ## normalize so pr_max = 1
-        pr_norm = pr / np.amax(pr)
-
-        ## calculate Rg
-        Rg = self.calc_Rg(r, pr_norm)
-        printt(f"        Rg  : {Rg:.3e} A")
-
-        #returned N values after generating
-        pr /= len(self.x)**2 #NOTE: N_total**2
-
-        return r, pr, pr_norm 
-    
-    @staticmethod
-    def save_pr(Nbins: int,
-                r: np.ndarray, 
-                pr_norm: np.ndarray, 
-                model_filename: str):
-        """
-        save p(r) to textfile
-        """
-        os.makedirs(model_filename, exist_ok=True)  
-        with open('%s/pr_%s.dat' % (model_filename,model_filename),'w') as f:
-            f.write('# %-17s %-17s\n' % ('r','p(r)'))
-            for i in range(Nbins):
-                f.write('  %-17.5e %-17.5e\n' % (r[i], pr_norm[i]))
-
-
-class StructureDecouplingApprox:
-    def __init__(self, q: np.ndarray, 
-                 x_new: np.ndarray, 
-                 y_new: np.ndarray, 
-                 z_new: np.ndarray, 
-                 sld_new: np.ndarray):
-        self.q = q
-        self.x_new = x_new
-        self.y_new = y_new
-        self.z_new = z_new
-        self.sld_new = sld_new
-
-    def calc_com_dist(self) -> np.ndarray:
-        """ 
-        calc contrast-weighted com distance
-        """
-        w = np.abs(self.sld_new)
-
-        if np.sum(w) == 0:
-            w = np.ones(len(self.x_new))
-
-        x_com, y_com, z_com = np.average(self.x_new, weights=w), np.average(self.y_new, weights=w), np.average(self.z_new, weights=w)
-        dx, dy, dz = self.x_new - x_com, self.y_new - y_com, self.z_new - z_com
-        com_dist = np.sqrt(dx**2 + dy**2 + dz**2)
-
-        return com_dist
-
-    def calc_A00(self) -> np.ndarray:
-        """
-        calc zeroth order sph harm, for decoupling approximation
-        """
-        d_new = self.calc_com_dist()
-        M = len(self.q)
-        A00 = np.zeros(M)
-        
-        for i in range(M):
-            qr = self.q[i] * d_new
-
-            A00[i] = sum(self.sld_new * sinc(qr))
-        A00 = A00 / A00[0] # normalise, A00[0] = 1
-
-        return A00
-
-    def decoupling_approx(self, Pq: np.ndarray, S: np.ndarray) -> np.ndarray:
-        """
-        modify structure factor with the decoupling approximation
-        for combining structure factors with non-spherical (or polydisperse) particles
-
-        see, for example, Larsen et al 2020: https://doi.org/10.1107/S1600576720006500
-        and refs therein
-
-        input
-        q
-        x,y,z,p    : coordinates and contrasts
-        Pq         : form factor
-        S          : structure factor
-
-        output
-        S_eff      : effective structure factor, after applying decoupl. approx
-        """
-        A00 = self.calc_A00()
-        const = 1e-3 # add constant in nominator and denominator, for stability (numerical errors for small values dampened)
-        Beta = (A00**2 + const) / (Pq + const)
-        S_eff = 1 + Beta * (S - 1)
-        return S_eff
-
-
-### structure factor classes
-
-class HardSphereStructure(StructureDecouplingApprox):
-    S_aliases = ["hardsphere","hs"]
-
-    def __init__(self, q: np.ndarray, 
-                 x_new: np.ndarray, 
-                 y_new: np.ndarray, 
-                 z_new: np.ndarray, 
-                 sld_new: np.ndarray, 
-                 par: List[float]):
-        super(HardSphereStructure, self).__init__(q, x_new, y_new, z_new, sld_new)
-        self.q = q
-        self.x_new = x_new
-        self.y_new = y_new
-        self.z_new = z_new
-        self.sld_new = sld_new
-        if len(par) != 2:
-            printt("\nERROR: structure factor hard-sphere needs 2 parameters, but " + str(len(par)) + ' parameters were given: ' + str(par) + '\n')
-            exit()  
-        self.conc,self.R_HS = par
-
-    # def calc_S_HS_(self) -> np.ndarray:
-    #     """
-    #     calculate the hard-sphere structure factor
-    #     calls function calc_G()
-
-    #     input
-    #     q       : momentum transfer
-    #     eta     : volume fraction
-    #     R       : estimation of the hard-sphere radius
-
-    #     output
-    #     S_HS    : hard-sphere structure factor
-    #     """
-    #     if self.conc > 0.0:
-    #         A = 2 * self.R_HS * self.q 
-    #         G = self.calc_G(A, self.conc)
-    #         S_HS = 1 / (1 + 24 * self.conc * G / A) # percus-yevick approximation
-    #     else:                         
-    #         S_HS = np.ones(len(self.q))
-
-    #     return S_HS
-    
-    # @staticmethod
-    # def calc_G(A: np.ndarray, eta: float) -> np.ndarray:
-    #     """ 
-    #     calculate G in the hard-sphere potential
-    #     A  : 2*R*q
-    #     eta: volume fraction
-    #     """
-    #     a = (1 + 2 * eta)**2 / (1 - eta)**4
-    #     b = -6 * eta * (1 + eta / 2)**2/(1 - eta)**4 
-    #     c = eta * a / 2
-    #     sinA = np.sin(A)
-    #     cosA = np.cos(A)
-    #     A2,A3,A4,A5 = A**2,A**3,A**4,A**5
-    #     fa = sinA - A * cosA
-    #     fb = 2 * A * sinA + (2 - A2) * cosA-2
-    #     fc = -A4 * cosA + 4 * ((3 * A2 - 6) * cosA + (A3 - 6 * A) * sinA + 6)
-    #     G = a * fa / A2 + b * fb / A3 + c * fc / A5
-    #     return G
-
-    def calc_S_HS(self) -> np.ndarray:
-        """
-        Calculate the hard-sphere structure factor using the Percus-Yevick approximation.
-        Implements the stable version with Taylor expansion for small A = 2*R*q.
-        adapted directly from the sasview code
-        """
-        if self.conc <= 0.0:
-            return np.ones(len(self.q))
-
-        vf = self.conc
-        R = self.R_HS
-        q = self.q
-        X = np.abs(2.0 * R * q)  # same as A in your earlier code
-
-        # Precompute constants
-        denom = (1.0 - vf)
-        if denom < 1e-12:  # avoid division by zero
-            return np.ones_like(q)
-
-        Xinv = 1.0 / denom
-        D = Xinv * Xinv
-        A = (1.0 + 2.0 * vf) * D
-        A *= A
-        B = (1.0 + 0.5 * vf) * D
-        B *= B
-        B *= -6.0 * vf
-        G = 0.5 * vf * A
-
-        # Cutoffs
-        cutoff_tiny = 5e-6
-        cutoff_series = 0.05  # corresponds to CUTOFFHS in C code
-
-        S_HS = np.empty_like(q)
-
-        for i, x in enumerate(X):
-            if x < cutoff_tiny:
-                # limit q -> 0
-                S_HS[i] = 1.0 / A
-            elif x < cutoff_series:
-                # Taylor series expansion
-                x2 = x * x
-                # Equivalent to the FF expression in the C code
-                FF = (8.0 * A + 6.0 * B + 4.0 * G
-                    + (-0.8 * A - B / 1.5 - 0.5 * G
-                        + (A / 35.0 + 0.0125 * B + 0.02 * G) * x2) * x2)
-                S_HS[i] = 1.0 / (1.0 + vf * FF)
-            else:
-                # Normal expression
-                x2 = x * x
-                x4 = x2 * x2
-                s, c = np.sin(x), np.cos(x)
-                # FF expression refactored from the C code
-                FF = ((G * ((4.0 * x2 - 24.0) * x * s
-                            - (x4 - 12.0 * x2 + 24.0) * c
-                            + 24.0) / x2
-                    + B * (2.0 * x * s - (x2 - 2.0) * c - 2.0)) / x
-                    + A * (s - x * c)) / x
-                S_HS[i] = 1.0 / (1.0 + 24.0 * vf * FF / x2)
-
-        return S_HS
-
-    def structure_eff(self, Pq: np.ndarray) -> np.ndarray:
-        S = self.calc_S_HS()
-        S_eff = self.decoupling_approx(Pq, S)
-        return S_eff 
-
-class Aggregation(StructureDecouplingApprox):
-    S_aliases = ["aggregation","aggr","frac2D"]
-
-    def __init__(self, q: np.ndarray, 
-                 x_new: np.ndarray, 
-                 y_new: np.ndarray, 
-                 z_new: np.ndarray, 
-                 sld_new: np.ndarray, 
-                 par: List[float]):
-        super(Aggregation, self).__init__(q, x_new, y_new, z_new, sld_new)
-        self.q = q
-        self.x_new = x_new
-        self.y_new = y_new
-        self.z_new = z_new
-        self.sld_new = sld_new
-        if len(par) != 3:
-            printt("\nERROR: structure factor aggregation needs 3 parameters, but " + str(len(par)) + ' parameters were given: ' + str(par) + '\n')
-            exit()  
-        self.Reff,self.Naggr,self.fracs_aggr = par
-
-    def calc_S_aggr(self) -> np.ndarray:
-        """
-        calculates fractal aggregate structure factor with dimensionality 2
-
-        S_{2,D=2} in Larsen et al 2020, https://doi.org/10.1107/S1600576720006500
-
-        input 
-        q      :
-        Naggr  : number of particles per aggregate
-        Reff   : effective radius of one particle 
-
-        output
-        S_aggr :
-        """
-        qR = self.q * self.Reff
-        S_aggr = 1 + (self.Naggr - 1)/(1 + qR**2 * self.Naggr / 3)
-        return S_aggr
-    
-    def structure_eff(self, Pq: np.ndarray) -> np.ndarray:
-        """Return effective structure factor for aggregation"""
-
-        S = self.calc_S_aggr()
-        S_eff = self.decoupling_approx(Pq, S)
-        S_eff = (1 - self.fracs_aggr) + self.fracs_aggr * S_eff
-        return S_eff
-
-class NoStructure(StructureDecouplingApprox):
-    S_aliases = ["none","no","one","unity"]
-
-    def __init__(self, q: np.ndarray, 
-                 x_new: np.ndarray, 
-                 y_new: np.ndarray, 
-                 z_new: np.ndarray, 
-                 sld_new: np.ndarray, 
-                 par: Any):
-        super(NoStructure, self).__init__(q, x_new, y_new, z_new, sld_new)
-        self.q = q
-        if len(par) != 0:
-            printt("\nERROR:  structure factor none needs 0 parameters, but " + str(len(par)) + ' parameters were given: ' + str(par) + '\n')
-            exit()  
-        
-    def structure_eff(self, Pq: Any) -> np.ndarray:
-        """Returns unity, no structure factor"""
-        return np.ones(len(self.q))
-
-class StructureFactor:
-
-    @staticmethod
-    def setAvailableStructureFactors():
-        """Dynamically build dictionary of Structure factor aliases (S_aliases) -> structure factor classes"""
-        current_module = sys.modules[__name__]
-        classes = inspect.getmembers(current_module, inspect.isclass)
-        registry = {}
-        for _, cls in classes:
-            if hasattr(cls, "S_aliases"):
-                for alias in cls.S_aliases:
-                    registry[alias.lower().replace("_", "").replace(" ", "")] = cls
-        return registry
-        
-    def __init__(self, q: np.ndarray, 
-                 x_new: np.ndarray, 
-                 y_new: np.ndarray, 
-                 z_new: np.ndarray, 
-                 sld_new: np.ndarray,
-                 Stype: str,
-                 par=None):
-        self.q = q
-        self.x_new = x_new
-        self.y_new = y_new
-        self.z_new = z_new
-        self.sld_new = sld_new
-        self.Stype = Stype.lower().replace("_", "").replace("-", "").replace(" ", "")
-        self.par = par
-        self.registry = StructureFactor.setAvailableStructureFactors()
-
-    def getStructureFactor(self):
-        """Return chosen structure factor"""
-        if self.Stype in self.registry:
-            cls = self.registry[self.Stype]
-            return cls(self.q, self.x_new, self.y_new, self.z_new, self.sld_new, self.par)
-        else:
-            raise ValueError(f"Structure factor '{self.Stype}' does not exist. Choose from {list(self.registry.keys())}")
-
-    @staticmethod
-    def save_S(q: np.ndarray, S_eff: np.ndarray, model_filename: str):
-        """ 
-        save S to file
-        """
-        with open('%s/Sq_%s.dat' % (model_filename,model_filename),'w') as f:
-            f.write('# Structure factor, S(q), used in: I(q) = P(q)*S(q)\n')
-            f.write('# Default: S(q) = 1.0\n')
-            f.write('# %-17s %-17s\n' % ('q','S(q)'))
-            for (q_i, S_i) in zip(q, S_eff):
-                f.write('  %-17.5e%-17.5e\n' % (q_i, S_i))
-
-class ITheoretical:
-    def __init__(self, q: np.ndarray):
-        self.q = q
-
-    def calc_Pq(self, r: np.ndarray, pr: np.ndarray, conc: float, volume_total: float) -> Vector2D:
-        """
-        calculate form factor, P(q), and forward scattering, I(0), using pair distribution, p(r) 
-        """
-        ## calculate P(q) and I(0) from p(r)
-        I0, Pq = 0, 0
-        for (r_i, pr_i) in zip(r, pr):
-            I0 += pr_i
-            qr = self.q * r_i
-            Pq += pr_i * sinc(qr)
-    
-        # normalization, P(0) = 1
-        if I0 == 0:
-            I0 = 1E-5
-        elif I0 < 0:
-            I0 = abs(I0)
-        Pq /= I0
-
-        # make I0 scale with volume fraction (concentration) and 
-        # volume squared and scale so default values gives I(0) of approx unity
-
-        I0 *= conc * volume_total * 1E-4
-
-        return I0, Pq
-    
-    def calc_Iq(self, Pq: np.ndarray, 
-                S_eff: np.ndarray, 
-                sigma_r: float) -> np.ndarray:
-        """
-        calculates intensity
-        """
-
-        ## multiply formfactor with structure factor
-        I = Pq * S_eff
-
-        ## interface roughness (Skar-Gislinge et al. 2011, DOI: 10.1039/c0cp01074j)
-        if sigma_r > 0.0:
-            roughness = np.exp(-(self.q * sigma_r)**2 / 2)
-            I *= roughness
-
-        return I
-
-    def save_I(self, I: np.ndarray, model_filename: str):
-        """Save theoretical intensity to file"""
-
-        with open('%s/Iq_%s.dat' % (model_filename,model_filename),'w') as f:
-            f.write('# Theoretical SAS data\n')
-            f.write('# %-12s %-12s\n' % ('q','I'))
-            for i in range(len(I)):
-                f.write('  %-12.5e %-12.5e\n' % (self.q[i], I[i]))
-
-class IExperimental:
-    def __init__(self, 
-                 q: np.ndarray, 
-                 I0: np.ndarray, 
-                 I: np.ndarray, 
-                 exposure: float):
-        self.q = q
-        self.I0 = I0
-        self.I = I
-        self.exposure = exposure
-
-    def simulate_data(self) -> Vector2D:
-        """
-        Simulate SAXS data using calculated scattering and empirical expression for sigma
-
-        input
-        q,I      : calculated scattering, normalized
-        I0       : forward scattering
-        #noise   : relative noise (scales the simulated sigmas by a factor)
-        exposure : exposure (in arbitrary units) - affects the noise level of data
-
-        output
-        sigma    : simulated noise
-        Isim     : simulated data
-
-        data is also written to a file
-        """
-
-        ## simulate exp error
-        #input, sedlak errors (https://doi.org/10.1107/S1600576717003077)
-        #k = 5000000
-        #c = 0.05
-        #sigma = noise*np.sqrt((I+c)/(k*q))
-
-        ## simulate exp error, other approach, also sedlak errors
-
-        # set constants
-        k = 4500
-        c = 0.85
-
-        # convert from intensity units to counts
-        I_sed = self.exposure * self.I0 * self.I
-
-        # make N
-        N = k * self.q # original expression from Sedlak2017 paper
-
-        qt = 1.4 # threshold - above this q value, the linear expression do not hold
-        a = 3.0 # empirical constant 
-        b = 0.6 # empirical constant
-        idx = np.where(self.q > qt)
-        N[idx] = k * qt * np.exp(-0.5 * ((self.q[idx] - qt) / b)**a)
-
-        # make I(q_arb)
-        q_max = np.amax(self.q)
-        q_arb = 0.3
-        if q_max <= q_arb:
-           I_sed_arb = I_sed[-2]
-        else: 
-            idx_arb = np.where(self.q > q_arb)[0][0]
-            I_sed_arb = I_sed[idx_arb]
-
-        # calc variance and sigma
-        v_sed = (I_sed + 2 * c * I_sed_arb / (1 - c)) / N
-        sigma_sed = np.sqrt(v_sed)
-
-        # rescale
-        sigma = sigma_sed / self.exposure
-
-        ## simulate data using errors
-        mu = self.I0 * self.I
-        Isim = np.random.normal(mu, sigma)
-
-        return Isim, sigma
-
-    def save_Iexperimental(self, Isim: np.ndarray, sigma: np.ndarray, model_filename: str):
-        with open('%s/Isim_%s.dat' % (model_filename,model_filename),'w') as f:
-            f.write('# Simulated SAS data with noise\n')
-            f.write('# sigma generated using Sedlak et al, k=100000, c=0.55, https://doi.org/10.1107/S1600576717003077, and rebinned with 10 per bin)\n')
-            f.write('# %-12s %-12s %-12s\n' % ('q','I','sigma'))
-            for i in range(len(Isim)):
-                f.write('  %-12.5e %-12.5e %-12.5e\n' % (self.q[i], Isim[i], sigma[i]))
-
-
-def get_max_dimension(x_list: np.ndarray, y_list: np.ndarray, z_list: np.ndarray) -> float:
+def get_max_dimension(x_list, y_list, z_list):
     """
     find max dimensions of n models
     used for determining plot limits
@@ -1485,7 +791,6 @@ def get_max_dimension(x_list: np.ndarray, y_list: np.ndarray, z_list: np.ndarray
 
     return max_l
 
-
 def plot_2D(x_list: np.ndarray, 
             y_list: np.ndarray, 
             z_list: np.ndarray, 
@@ -1494,7 +799,7 @@ def plot_2D(x_list: np.ndarray,
             high_res: bool,
             colors: List[str]) -> None:
     """
-    plot 2D-projections of generated points (shapes) using matplotlib:
+    plot 2D-projections of generated points (shapes):
     positive contrast in red (Model 1) or blue (Model 2) or yellow (Model 3) or green (Model 4)
     zero contrast in grey
     negative contrast in black
@@ -1506,7 +811,6 @@ def plot_2D(x_list: np.ndarray,
 
     output
     plot                   : points_<model_filename>.png
-
     """
 
     ## figure settings
@@ -1560,23 +864,12 @@ def plot_2D(x_list: np.ndarray,
             plt.savefig('%s/points_%s.png' % (model_filename,model_filename))
         plt.close()
 
-def plot_results(q: np.ndarray, 
-                 r_list: List[np.ndarray], 
-                 pr_list: List[np.ndarray], 
-                 I_list: List[np.ndarray], 
-                 Isim_list: List[np.ndarray], 
-                 sigma_list: List[np.ndarray], 
-                 S_list: List[np.ndarray], 
-                 name_list: List[str], 
-                 xscale_lin: bool, 
-                 high_res: bool,
-                 colors: List[str]) -> None:
+def plot_results(q, r_list, pr_list, I_list, Isim_list, sigma_list, S_list, name_list, xscale_lin, high_res, colors):
     """
-    plot results for all models, using matplotlib:
+    plot results for all models:
     - p(r) 
-    - calculated formfactor, P(r) on log-log or log-lin scale
-    - simulated noisy data on log-log or log-lin scale
-
+    - calculated formfactor P(r) times structure factor S(q) on log-log or log-lin scale
+    - simulated data on log-log or log-lin scale
     """
     fig, ax = plt.subplots(1,3,figsize=(12,4))
 
@@ -1632,8 +925,7 @@ def plot_sesans(delta_list, G_list, Gsim_list, sigma_G_list, name_list, high_res
     for (d, G, Gsim, sigmaG, model_name, color) in zip (delta_list, G_list, Gsim_list, sigma_G_list, name_list, colors):
 
         ax[0].plot(d, G, zorder=zo, color=color,label=r'$G$, %s' % model_name)
-        #ax[0].set_ylabel(r'$G$ [a.u.]')
-        ax[0].set_ylabel(r'$G(\delta)$ [cm$^{-1}$]')
+        ax[0].set_ylabel(r'$G(\delta)$ [$\mathrm{\AA}^{-2}$cm$^{-1}$]')
         ax[0].set_xlabel(r'$\delta$ [$\mathrm{\AA}$]')
         ax[0].set_title('theoretical SESANS, no noise')
         ax[0].legend(frameon=False)
@@ -1657,7 +949,7 @@ def plot_sesans(delta_list, G_list, Gsim_list, sigma_G_list, name_list, high_res
 def save_sesans(delta_list, G_list, Gsim_list, sigma_G_list, name_list):
 
     for (d, G, Gsim, sigmaG, model_name) in zip (delta_list, G_list, Gsim_list, sigma_G_list, name_list):
-        model_name 
+         
         with open('%s/G_%s.ses' % (model_name,model_name),'w') as f:
             f.write('# Theoretical SESANS data\n')
             f.write('# %-12s %-12s\n' % ('delta','G'))
@@ -1708,21 +1000,6 @@ def generate_pdb(x_list: List[np.ndarray],
                 f.write('ATOM  %6i %s   ALA A%6i  %8.3f%8.3f%8.3f  1.00  0.00           %s \n'  % (i,atom,i,x[i],y[i],z[i],atom))
             f.write('END')
 
-
-def check_unique(A_list: List[float]) -> bool:
-    """
-    if all elements in a list are unique then return True, else return False
-    """
-    unique = True
-    N = len(A_list)
-    for i in range(N):
-        for j in range(N):
-            if i != j:
-                if A_list[i] == A_list[j]:
-                    unique = False
-
-    return unique
-
 def calc_G_sesans(q,delta,I) -> np.ndarray:
     """
     Calculated projected correlation function for SESANS from Hankel Transform of I(q)
@@ -1737,33 +1014,6 @@ def calc_G_sesans(q,delta,I) -> np.ndarray:
         G[i] = 1 / 2 / np.pi * np.sum(dq_int * q * I * j0(delta_i * q))
 
     return G
-
-def simulate_data_sesans(self) -> Vector2D:
-    """
-    Simulate SESANS data using calculated scattering and estimate for sigma
-
-    input
-    delta, G: spin-echo lengths and corresponding theoretical G_delta
-    sesans_noise: baseline noise level
-
-    output
-    sesans_sigma: simulated errors
-    Gsim: simulated data
-
-    data is also written to a file
-    """
-
-    # Compute baseline noise as sesans_noise % of min(G-G(0))
-    noise_baseline = self.sesans_noise * np.abs(np.min(self.G - self.G[0]))
-
-    # Compute delta-dependent noise as function of baseline noise
-    m = 1/50000 # 1/50000 adds a baseline worth of noise per 5 micrometers of additional spin echo length (delta)
-    sesans_sigma = np.linspace(noise_baseline, noise_baseline * (1 + m * (self.delta[-1] - self.delta[0])), np.size(self.delta))
-
-    # Simulate SESANS data using errors
-    lnPsim = np.random.normal((self.G - self.G[0]), sesans_sigma)
-
-    return lnPsim, sesans_sigma
 
 def str2bool(v):
     """
@@ -1796,15 +1046,6 @@ def float_list(arg):
     arg = re.sub(r'\s+', ' ', arg.strip())
     arg = re.findall(r"[-+]?\d*\.?\d+(?:[eE][-+]?\d+)?", arg)
     return [float(i) for i in arg]
-
-def parse_3_floats(s):
-    # accept both commas and spaces
-    parts = s.replace(",", " ").split()
-    if len(parts) != 3:
-        raise argparse.ArgumentTypeError(
-            f"Expected exactly 3 floats (x,y,z), got {len(parts)}: {s}"
-        )
-    return [float(x) for x in parts]
 
 def check_3Dinput(input: list, default: list, name: str, N_subunits: int, i: int):
     """
@@ -1862,134 +1103,535 @@ class ModelPointDistribution:
     sld: np.ndarray #scattering length density for each point
     volume_total: float
 
-@dataclass
-class SimulationParameters:
-    """
-    Class containing parameters for the simulation and default parameters
-    """
-
-    qmin: float = 0.001
-    qmax: float =  0.5
-    qpoints: int = 400
-    prpoints: int = 100
-    Npoints: int = 8000
-    model_name: List[str] = field(default_factory=lambda: ['Model_1'])
-
-@dataclass
-class ModelSystem:
-    """
-    Parameters for the system
-    """
-
-    PointDistribution: ModelPointDistribution
-    Stype: str = field(default_factory=lambda: "None") #structure factor
-    par: List[float] = field(default_factory=np.ndarray) #parameters for structure factor
-    polydispersity: float = 0.0 #polydispersity
-    conc: float = 0.02 #concentration, as volume fraction
-    sigma_r: float = 0.0 #interface roughness
-
-@dataclass
-class TheoreticalScatteringCalculation:
-    """Class containing parameters for simulating
-    scattering for a given model system"""
-
-    System: ModelSystem
-    Calculation: SimulationParameters
-
-@dataclass
-class TheoreticalScattering:
-    """Class containing parameters for
-    theoretical scattering"""
-
-    q: np.ndarray
-    I0: np.ndarray
-    I: np.ndarray
-    S_eff: np.ndarray
-    r: np.ndarray #pair distance distribution
-    pr: np.ndarray #pair distance distribution
-    pr_norm: np.ndarray #normalized pair distance distribution
-
-@dataclass
-class SimulateScattering:
-    """Class containing parameters for
-    simulating scattering"""
-
-    q: np.ndarray = field(default_factory=np.ndarray)
-    I0: np.ndarray = field(default_factory=np.ndarray)
-    I: np.ndarray = field(default_factory=np.ndarray)
-    exposure: float = 500
-
-@dataclass
-class SimulatedScattering:
-    """Class containing parameters for
-    simulated scattering"""
-
-    I_sim: np.ndarray
-    q: np.ndarray
-    I_err: np.ndarray
-
-def getTheoreticalScattering(scalc: TheoreticalScatteringCalculation) -> TheoreticalScattering:
-    """Calculate theoretical scattering for a given model."""
-    sys = scalc.System
-    prof = sys.PointDistribution
-    calc = scalc.Calculation
-    x = np.concatenate(prof.x)
-    y = np.concatenate(prof.y)
-    z = np.concatenate(prof.z)
-    p = np.concatenate(prof.sld)
-
-    r, pr, pr_norm = WeightedPairDistribution(x, y, z, p).calc_pr(calc.prpoints, sys.polydispersity)
-
-    printt('        calculating scattering...')
-    q = np.linspace(calc.qmin, calc.qmax, calc.qpoints)
-    I_theory = ITheoretical(q)
-    I0, Pq = I_theory.calc_Pq(r, pr, sys.conc, prof.volume_total)
-
-    S_class = StructureFactor(q, x, y, z, p, sys.Stype, sys.par)
-    S_eff = S_class.getStructureFactor().structure_eff(Pq)
-
-    I = I_theory.calc_Iq(Pq, S_eff, sys.sigma_r)
-
-    return TheoreticalScattering(q=q, I=I, I0=I0, S_eff=S_eff, r=r, pr=pr, pr_norm=pr_norm)
-
-def getSimulatedScattering(scalc: SimulateScattering) -> SimulatedScattering:
-    """Simulate scattering for a given theoretical scattering."""
-
-    Isim_class = IExperimental(scalc.q, scalc.I0, scalc.I, scalc.exposure)
-    I_sim, I_err = Isim_class.simulate_data()
-
-
-    return SimulatedScattering(I_sim=I_sim, q=scalc.q, I_err=I_err)
-
 def getPointDistribution(subunit_type,sld,dimensions,com,rotation,exclude_overlap,Npoints):
     x_new, y_new, z_new, sld_new, volume_total = GenerateAllPoints(Npoints, com, subunit_type, dimensions, rotation, sld, exclude_overlap).onGeneratingAllPointsSeparately()
     return ModelPointDistribution(x=x_new, y=y_new, z=z_new, sld=sld_new, volume_total=volume_total)
 
-def simulate_sesans(delta,G,error):
-    """
-    Simulate SESANS data using calculated scattering and estimate for sigma
+#########################################################################################################
+########################### Subunits ####################################################################
+#########################################################################################################
 
-    input
-    delta, G: spin-echo lengths and theoretical G(delta)
-    error: relative error
+def check_dimension(name,dimensions,n):
+    len_dim = len(dimensions)
+    if len_dim != n:
+            dim = ' dimension ' if n == 1 else ' dimensions '
+            were = ' was ' if len_dim == 1 else ' were '
+            printt("\nERROR: subunit " + name + " needs " + str(n) + dim + "(provided after --dimensions or -d), but " + str(len_dim) + were + "given: " + str(dimensions) + "\n")
+            exit()
 
-    output
-    sesans_sigma: simulated errors
-    lnPsim: simulated data
+class Sphere:
+    aliases = ["sphere","ball","sph"]
 
-    """
-    # Compute baseline noise as sesans_noise % of min(G-G(0))
-    noise_baseline = error * np.abs(np.min(G - G[0]))
-    # Compute delta-dependent noise as function of baseline noise
-    m = 1/50000 # 1/50000 adds a baseline worth of noise per 5 micrometers of additional spin echo length (delta)
-    d_delta = delta[-1] - delta[0]
-    sesans_sigma = np.linspace(noise_baseline, noise_baseline * (1 + m * d_delta), len(delta))
-    # pick random points using mean and sigma
-    lnPsim = np.random.normal((G - G[0]), sesans_sigma)
-    return lnPsim,sesans_sigma
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,1)
+        self.R = dimensions[0]
 
-def save_points(x,y,z,sld,model_name):
-        with open('%s/points_%s.txt' % (model_name,model_name),'w') as f:
-            f.write('# x y z sld\n')
-            for xi,yi,zi,s in zip(x,y,z,sld):
-                f.write('%f %f %f %f\n' % (xi,yi,zi,s))
+    def getVolume(self) -> float:
+        """Returns the volume of a sphere"""
+        return (4 / 3) * np.pi * self.R**3
+    
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a sphere"""
+
+        Volume = self.getVolume()
+        Volume_max = (2*self.R)**3 ###Box around sphere.
+        Vratio = Volume_max/Volume
+
+        N = int(Vratio * Npoints)
+        x = np.random.uniform(-self.R, self.R, N)
+        y = np.random.uniform(-self.R, self.R, N)
+        z = np.random.uniform(-self.R, self.R, N)
+        d = np.sqrt(x**2 + y**2 + z**2)
+
+        idx = np.where(d < self.R) #save points inside sphere
+        x_add,y_add,z_add = x[idx], y[idx], z[idx]
+
+        return x_add, y_add, z_add
+
+    def checkOverlap(self, 
+                     x_eff: np.ndarray, 
+                     y_eff: np.ndarray, 
+                     z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a sphere"""
+
+        d = np.sqrt(x_eff**2+y_eff**2+z_eff**2)
+        idx = np.where(d > self.R)
+        return idx
+
+class HollowSphere:
+    aliases = ["hollowsphere","shell"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,2)
+        self.R,self.r = dimensions
+
+    def getVolume(self) -> float:
+        """Returns the volume of a hollow sphere"""
+        if self.r > self.R:
+            self.R, self.r = self.r, self.R
+        if self.r == self.R:
+            return 4 * np.pi * self.R**2 #surface area of a sphere
+        else: 
+            return (4 / 3) * np.pi * (self.R**3 - self.r**3)
+
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a hollow sphere"""
+        Volume = self.getVolume()
+        if self.r == self.R:
+            #The hollow sphere is a shell
+            phi = np.random.uniform(0,2 * np.pi, Npoints)
+            costheta = np.random.uniform(-1, 1, Npoints)
+            theta = np.arccos(costheta)
+
+            x_add = self.R * np.sin(theta) * np.cos(phi)
+            y_add = self.R * np.sin(theta) * np.sin(phi)
+            z_add = self.R * np.cos(theta)
+            return x_add, y_add, z_add
+        Volume_max = (2*self.R)**3 ###Box around the sphere
+        Vratio = Volume_max/Volume
+
+        N = int(Vratio * Npoints)
+        x = np.random.uniform(-self.R, self.R, N)
+        y = np.random.uniform(-self.R, self.R, N)
+        z = np.random.uniform(-self.R, self.R, N)
+        d = np.sqrt(x**2 + y**2 + z**2)
+
+        idx = np.where((d < self.R) & (d > self.r))
+        x_add, y_add, z_add = x[idx], y[idx], z[idx]
+        return x_add, y_add, z_add
+
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a hollow sphere"""
+
+        d = np.sqrt(x_eff**2+y_eff**2+z_eff**2)
+        if self.r > self.R:
+             self.r, self.R = self.R, self.r
+        if self.r == self.R:
+            idx = np.where(d != self.R)
+            return idx
+        else:
+            idx = np.where((d > self.R) | (d < self.r))
+            return idx
+
+class Cylinder:
+    aliases = ["cylinder","disc","rod","cyl"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,2)     
+        self.R,self.l = dimensions
+
+    def getVolume(self) -> float:
+        """Returns the volume of a cylinder"""
+
+        return np.pi * self.R**2 * self.l
+    
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a cylinder"""
+
+        Volume = self.getVolume()
+        Volume_max = 2 * self.R * 2 * self.R * self.l
+        Vratio = Volume_max / Volume
+
+        N = int(Vratio * Npoints)
+        x = np.random.uniform(-self.R, self.R, N)
+        y = np.random.uniform(-self.R, self.R, N)
+        z = np.random.uniform(-self.l / 2, self.l / 2, N)
+        d = np.sqrt(x**2 + y**2)
+        idx = np.where(d < self.R)
+        x_add,y_add,z_add = x[idx],y[idx],z[idx]
+
+        return x_add, y_add, z_add
+
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a cylinder"""
+
+        d = np.sqrt(x_eff**2+y_eff**2)
+        idx = np.where((d > self.R) | (abs(z_eff) > self.l / 2))
+        return idx
+
+class Ellipsoid:
+    aliases = ["ellipsoid","ellips"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,3)     
+        self.a,self.b,self.c = dimensions
+
+    def getVolume(self) -> float:
+        """Returns the volume of an ellipsoid"""
+        return (4 / 3) * np.pi * self.a * self.b * self.c
+
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of an ellipsoid"""
+        Volume = self.getVolume()
+        Volume_max = 2 * self.a * 2 * self.b * 2 * self.c
+        Vratio = Volume_max / Volume
+
+        N = int(Vratio * Npoints)
+        x = np.random.uniform(-self.a, self.a, N)
+        y = np.random.uniform(-self.b, self.b, N)
+        z = np.random.uniform(-self.c, self.c, N)
+
+        d2 = x**2 / self.a**2 + y**2 / self.b**2 + z**2 / self.c**2
+        idx = np.where(d2 < 1)
+        x_add, y_add, z_add = x[idx], y[idx], z[idx]
+
+        return x_add, y_add, z_add
+
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """check for points within a ellipsoid"""
+
+        d2 = x_eff**2 / self.a**2 + y_eff**2 / self.b**2 + z_eff**2 / self.c**2
+        idx = np.where(d2 > 1)
+
+        return idx
+
+class EllipticalCylinder:
+    aliases = ["ellipticalcylinder","ellipticalcyl","ellipticalrod"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,3)     
+        self.a,self.b,self.l = dimensions
+
+    def getVolume(self) -> float:
+        """Returns the volume of an elliptical cylinder"""
+        return np.pi * self.a * self.b * self.l
+
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of an elliptical cylinder"""
+
+        Volume = self.getVolume()
+        Volume_max = 2 * self.a * 2 * self.b * self.l
+        Vratio = Volume_max / Volume
+
+        N = int(Vratio * Npoints)
+        x = np.random.uniform(-self.a, self.a, N)
+        y = np.random.uniform(-self.b, self.b, N)
+        z = np.random.uniform(-self.l / 2, self.l / 2, N)
+
+        d2 = x**2 / self.a**2 + y**2 / self.b**2
+        idx = np.where(d2 < 1)
+        x_add, y_add, z_add = x[idx], y[idx], z[idx]
+
+        return x_add, y_add, z_add 
+
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a Elliptical cylinder"""
+        d2 = x_eff**2 / self.a**2 + y_eff**2 / self.b**2
+        idx = np.where((d2 > 1) | (abs(z_eff) > self.l / 2))
+        return idx
+
+class Cube:
+    aliases = ["cube","dice"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,1)     
+        self.a = dimensions[0]
+
+    def getVolume(self) -> float:
+        """Returns the volume of a cube"""
+        return self.a**3
+
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a cube"""
+
+        Volume = self.getVolume()
+
+        N = Npoints
+        x_add = np.random.uniform(-self.a, self.a, N)
+        y_add = np.random.uniform(-self.a, self.a, N)
+        z_add = np.random.uniform(-self.a, self.a, N)
+
+        return x_add, y_add, z_add
+
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a cube"""
+
+        idx = np.where((abs(x_eff) >= self.a/2) | (abs(y_eff) >= self.a/2) | 
+            (abs(z_eff) >= self.a/2) | ((abs(x_eff) <= self.b/2) 
+            & (abs(y_eff) <= self.b/2) & (abs(z_eff) <= self.b/2)))
+        
+        return idx
+
+class HollowCube:
+    aliases = ["hollowcube","hollowdice"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,2)     
+        self.a,self.b = dimensions
+
+    def getVolume(self) -> float:
+        """Returns the volume of a hollow cube"""
+        if self.a < self.b:
+            self.a, self.b = self.b, self.a
+        if self.a == self.b:
+            return 6 * self.a**2 #surface area of a cube
+        else: 
+            return self.a**3 - self.b**3
+    
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a hollow cube"""
+
+        Volume = self.getVolume()
+        
+        if self.a == self.b:
+            #The hollow cube is a shell
+            d = self.a / 2
+            N = int(Npoints / 6)
+            one = np.ones(N)
+            
+            #make each side of the cube at a time
+            x_add, y_add, z_add = [], [], []
+            for sign in [-1, 1]:
+                x_add = np.concatenate((x_add, sign * one * d))
+                y_add = np.concatenate((y_add, np.random.uniform(-d, d, N)))
+                z_add = np.concatenate((z_add, np.random.uniform(-d, d, N)))
+                
+                x_add = np.concatenate((x_add, np.random.uniform(-d, d, N)))
+                y_add = np.concatenate((y_add, sign * one * d))
+                z_add = np.concatenate((z_add, np.random.uniform(-d, d, N)))
+
+                x_add = np.concatenate((x_add, np.random.uniform(-d, d, N)))
+                y_add = np.concatenate((y_add, np.random.uniform(-d, d, N)))
+                z_add = np.concatenate((z_add, sign * one * d))
+            return x_add, y_add, z_add
+        
+        Volume_max = self.a**3
+        Vratio = Volume_max / Volume
+        N = int(Vratio * Npoints)
+
+        x = np.random.uniform(-self.a / 2,self.a / 2, N)
+        y = np.random.uniform(-self.a / 2,self.a / 2, N)
+        z = np.random.uniform(-self.a / 2,self.a / 2, N)
+
+        d = np.maximum.reduce([abs(x), abs(y), abs(z)])
+        idx = np.where(d >= self.b / 2)
+        x_add,y_add,z_add = x[idx], y[idx], z[idx]
+
+        return x_add, y_add, z_add
+
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a hollow cube"""
+
+        if self.a < self.b:
+            self.a, self.b = self.b, self.a
+        
+        if self.a == self.b:
+            idx = np.where((abs(x_eff)!=self.a/2) | (abs(y_eff)!=self.a/2) | (abs(z_eff)!=self.a/2))
+            return idx
+        
+        else: 
+            idx = np.where((abs(x_eff) >= self.a/2) | (abs(y_eff) >= self.a/2) | 
+            (abs(z_eff) >= self.a/2) | ((abs(x_eff) <= self.b/2) 
+            & (abs(y_eff) <= self.b/2) & (abs(z_eff) <= self.b/2)))
+
+        return idx
+
+class Cuboid:
+    aliases = ["cuboid","brick"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,3)     
+        self.a,self.b,self.c = dimensions
+
+    def getVolume(self) -> float:
+        """Returns the volume of a cuboid"""
+        return self.a * self.b * self.c
+    
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a cuboid"""
+        Volume = self.getVolume()
+        x_add = np.random.uniform(-self.a, self.a, Npoints)
+        y_add = np.random.uniform(-self.b, self.b, Npoints)
+        z_add = np.random.uniform(-self.c, self.c, Npoints)
+        return x_add, y_add, z_add
+    
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a Cuboid"""
+        idx = np.where((abs(x_eff) >= self.a/2) 
+        | (abs(y_eff) >= self.b/2) | (abs(z_eff) >= self.c/2))
+        return idx
+
+class CylinderRing:
+    aliases = ["cylinderring","ring","cylring","discring","hollowcylinder","hollowdisc","hollowrod"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,3)     
+        self.R,self.r,self.l = dimensions
+    
+    def getVolume(self) -> float:
+        """Returns the volume of a cylinder ring"""
+        if self.r > self.R:
+            self.R, self.r = self.r, self.R
+        if self.r == self.R:
+            return 2 * np.pi * self.R * self.l #surface area of a cylinder
+        else: 
+            return np.pi * (self.R**2 - self.r**2) * self.l
+
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a cylinder ring"""
+        Volume = self.getVolume()
+        if self.r == self.R:
+            #The cylinder ring is a shell
+            phi = np.random.uniform(0, 2 * np.pi, Npoints)
+            x_add = self.R * np.cos(phi)
+            y_add = self.R * np.sin(phi)
+            z_add = np.random.uniform(-self.l / 2, self.l / 2, Npoints)
+            return x_add, y_add, z_add
+        Volume_max = 2 * self.R * 2 * self.R * self.l
+        Vratio = Volume_max / Volume
+        N = int(Vratio * Npoints)
+        x = np.random.uniform(-self.R, self.R, N)
+        y = np.random.uniform(-self.R, self.R, N)
+        z = np.random.uniform(-self.l / 2, self.l / 2, N)
+        d = np.sqrt(x**2 + y**2)
+        idx = np.where((d < self.R) & (d > self.r))
+        x_add, y_add, z_add = x[idx], y[idx], z[idx]
+        return x_add, y_add, z_add
+
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a cylinder ring"""
+        d = np.sqrt(x_eff**2 + y_eff**2)
+        if self.r > self.R:
+            self.R, self.r = self.r, self.R
+        if self.r == self.R:
+            idx = np.where((d != self.R) | (abs(z_eff) > self.l / 2))
+            return idx
+        else: 
+            idx = np.where((d > self.R) | (d < self.r) | (abs(z_eff) > self.l / 2))
+            return idx
+
+class Torus:
+    aliases = ["torus","toroid","doughnut"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,2)     
+        self.R,self.r = dimensions
+
+    def getVolume(self) -> float:
+        """Returns the volume of a torus"""
+
+        return 2 * np.pi**2 * self.r**2 * self.R
+
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a torus"""
+        Volume = self.getVolume()
+        L = 2 * (self.R + self.r)
+        l = 2 * self.r
+        Volume_max = L*L*l
+        Vratio = Volume_max / Volume
+        N = int(Vratio * Npoints)
+        x = np.random.uniform(-L/2, L/2, N)
+        y = np.random.uniform(-L/2, L/2, N)
+        z = np.random.uniform(-l/2, l/ 2, N)
+        # equation: (R-sqrt(x**2+y**2))**2 + z**2 = (R-d)**2 + z**2 = r
+        d = np.sqrt(x**2 + y**2)
+        idx = np.where((self.R-d)**2 + z**2 < self.r**2)
+        x_add, y_add, z_add = x[idx], y[idx], z[idx]
+
+        return x_add, y_add, z_add
+
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a torus"""
+        d = np.sqrt(x_eff**2 + y_eff**2)
+        idx = np.where((self.R-d)**2 + z_eff**2 > self.r**2)
+        return idx
+        
+class Hyperboloid:
+    aliases = ["hyperboloid", "hourglass", "coolingtower"]
+    
+    # https://mathworld.wolfram.com/One-SheetedHyperboloid.html
+    # https://www.vcalc.com/wiki/hyperboloid-volume
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,3)     
+        self.r,self.c,self.h = dimensions
+
+    def getVolume(self) -> float:
+        """Returns the volume of a hyperboloid"""
+        return np.pi * 2*self.h * self.r**2 * ( 1 + (2*self.h)**2 / ( 12 * self.c**2 ) )
+
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a hyperboloid"""
+        #Volume = self.getVolume()
+        L = 2 * self.h
+        R = self.r * np.sqrt( 1 + L**2 / (4 * self.c**2 ) )
+        Volume_max = 2*self.h * 2*R * 2*R
+        Volume = np.pi * L * ( 2 * self.r**2 + R**2 ) / 3
+        Vratio = Volume_max / Volume
+        N = int(Vratio * Npoints)
+        x = np.random.uniform(-R, R, N)
+        y = np.random.uniform(-R, R, N)
+        z = np.random.uniform(-self.h, self.h, N)
+        idx = np.where(x**2/self.r**2 + y**2/self.r**2 - z**2/self.c**2 < 1.0)
+        x_add, y_add, z_add = x[idx], y[idx], z[idx]
+        return x_add, y_add, z_add
+
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a Hyperboloid"""
+        idx = np.where(x_eff**2/self.r**2 + y_eff**2/self.r**2 - z_eff**2/self.c**2 > 1.0)
+        return idx
+    
+class Superellipsoid:
+    aliases = ["superellipsoid","superellips"]
+
+    def __init__(self, dimensions: List[float]):
+        check_dimension(self.aliases[0],dimensions,4)     
+        self.R,self.eps,self.t,self.s = dimensions
+
+    @staticmethod
+    def beta(a, b) -> float:
+        """beta function"""
+        return gamma(a) * gamma(b) / gamma(a + b)
+
+    def getVolume(self) -> float:
+        """Returns the volume of a superellipsoid"""
+        return (8 / (3 * self.t * self.s) * self.R**3 * self.eps * 
+                self.beta(1 / self.s, 1 / self.s) * self.beta(2 / self.t, 1 / self.t))
+    
+    def getPointDistribution(self, Npoints: int) -> Vector3D:
+        """Returns the point distribution of a superellipsoid"""
+        Volume = self.getVolume()
+        Volume_max = 2 * self.R * self.eps * 2 * self.R * 2 * self.R
+        Vratio = Volume_max / Volume
+        N = int(Vratio * Npoints)
+        x = np.random.uniform(-self.R, self.R, N)
+        y = np.random.uniform(-self.R, self.R, N)
+        z = np.random.uniform(-self.R * self.eps, self.R * self.eps, N)
+        d = ((np.abs(x)**self.s + np.abs(y)**self.s)**(self.t/ self.s) 
+            + np.abs(z / self.eps)**self.t)
+        idx = np.where(d < np.abs(self.R)**self.t)
+        x_add, y_add, z_add = x[idx], y[idx], z[idx]
+        return x_add, y_add, z_add
+    
+    def checkOverlap(self, x_eff: np.ndarray, 
+                           y_eff: np.ndarray, 
+                           z_eff: np.ndarray) -> np.ndarray:
+        """Check for points within a superellipsoid"""
+        d = ((np.abs(x_eff)**self.s + np.abs(y_eff)**self.s)**(self.t / self.s) 
+        + np.abs(z_eff / self.eps)**self.t)
+        idx = np.where(d >= np.abs(self.R)**self.t)
+        return idx
+
+#########################################################################################################
+#########################################################################################################
+#########################################################################################################
