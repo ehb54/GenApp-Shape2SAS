@@ -52,19 +52,6 @@ if __name__=='__main__':
 #    command_to_execute = [path + '/shape2sas.py']
     command_to_execute = ['/opt/miniconda3/bin/python',path + '/shape2sas.py']
 
-    ## plot options
-    try:
-        dummy = json_variables['xscale_lin']
-        xscale_log = False
-    except:
-        xscale_log = True
-    try:
-        dummy = json_variables['high_res']
-        high_res = True
-    except:
-        high_res = False
-
-
     ## Model-dependent input 
     Model_list,model_name_list = [],[]
     Max_Number_of_Models = 4
@@ -132,7 +119,7 @@ if __name__=='__main__':
         except:
             pass
 
-    ## global options
+    ## global options for all models
     command_to_execute.extend(['--qmin',json_variables['qmin']])
     command_to_execute.extend(['--qmax',json_variables['qmax']])
     command_to_execute.extend(['--qpoints',json_variables['qpoints']])
@@ -145,18 +132,18 @@ if __name__=='__main__':
         sesans = True
     except:
         sesans = False
+
     ## plot options
     try:
         dummy = json_variables['xscale_lin']
         command_to_execute.extend(['--xscale_lin'])
-        xscale_log = False
     except:
         pass
-    try:
-        dummy = json_variables['high_res']
-        command_to_execute.extend(['--high_res'])
-    except:
-        pass
+#    try:
+#        dummy = json_variables['high_res']
+#        command_to_execute.extend(['--high_res'])
+#    except:
+#        pass
 
     ## run shape2sas
     message.udpmessage({"_textarea": 'Running Shape2SAS...\n'}) 
