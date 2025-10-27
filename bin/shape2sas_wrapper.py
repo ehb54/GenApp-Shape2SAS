@@ -160,7 +160,7 @@ if __name__=='__main__':
     for line in lines:
         if 'Rg  :' in line:
             Rg_list.append(float(line.split(':')[1].split('A')[0]))
-        if 'Dmax: ' in line:
+        if 'dmax: ' in line:
             dmax_list.append(float(line.split(':')[1].split('A')[0]))
 
     ## send output to GUI
@@ -169,7 +169,7 @@ if __name__=='__main__':
     output["fig"] = "%s/plot.png" % folder
     if sesans: 
         output["sesans_fig"] = "%s/sesans.png" % folder 
-    
+   
     # model-dependent output
     for (Model,model_name,Rg,dmax) in zip(Model_list,model_name_list,Rg_list,dmax_list):
         m = model_name.replace(" ", "_")

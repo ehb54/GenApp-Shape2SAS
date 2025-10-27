@@ -827,7 +827,8 @@
             ,"label"     : "Theoretical SESANS"
             ,"type"      : "file"
             ,"help"      : "<p>Calculated SESANS</p>"
-            ,"show"      : ["sesans","include_model_1"]
+            #,"show"      : ["sesans","include_model_1"]
+            ,"show"      : "sesans"
         }
 	,{
             "role"       : "output"
@@ -835,7 +836,8 @@
             ,"label"     : "SESANS, simulated (with errors)"
             ,"type"      : "file"
             ,"help"      : "<p>Simulated SESANS</p>"
-            ,"show"      : ["sesans","include_model_1"]
+            #,"show"      : ["sesans","include_model_1"]
+            ,"show"      : "sesans"
         }
 	,{
             "role"       : "output"
@@ -903,13 +905,21 @@
             ,"help"       : "<p>Simulated intensity, format: q, I(q), sigma.</p><p>sigma simulated using Sedlak et al (https://doi.org/10.1107/S1600576717003077)</p>"
             ,"show"       : "include_model_2"
         }
+	#,{
+  	#    "role"	: "input"
+  	#    ,"id"	 : "sesans_and_model2"
+  	#    ,"type"	 : "hidden"
+  	#    ,"value"     : "false"
+  	#    ,"computed"  : "sesans && include_model_2"
+	#}
         ,{
             "role"       : "output"
             ,"id"        : "G_2"
             ,"label"     : "Theoretical SESANS"
             ,"type"      : "file"
             ,"help"      : "<p>Calculated SESANS</p>"
-            ,"show"      : ["sesans","include_model_2"]
+            #,"show"      : "sesans_and_model2"
+            ,"show"       : "include_model_2"
         }
         ,{  
             "role"       : "output"
@@ -917,7 +927,8 @@
             ,"label"     : "SESANS, simulated (with errors)"
             ,"type"      : "file"
             ,"help"      : "<p>Simulated SESANS</p>"
-            ,"show"      : ["sesans","include_model_2"]
+            #,"show"      : "sesans_and_model_2"
+            ,"show"       : "include_model_2"
         }
         ,{
             "role"       : "output"
@@ -985,13 +996,21 @@
             ,"help"       : "<p>Simulated intensity, format: q, I(q), sigma.</p><p>sigma simulated using Sedlak et al (https://doi.org/10.1107/S1600576717003077)</p>"
             ,"show"       : "include_model_3"
         }
+	#,{
+        #    "role"      : "input"
+        #    ,"id"        : "sesans_and_model3"
+        #    ,"type"      : "hidden"
+        #    ,"value"     : "false"
+        #    ,"computed"  : "sesans && include_model_3"
+        #}
         ,{  
             "role"       : "output"
             ,"id"        : "G_3"
             ,"label"     : "Theoretical SESANS"
             ,"type"      : "file"
             ,"help"      : "<p>Calculated SESANS</p>"
-            ,"show"      : ["sesans","include_model_3"]
+            #,"show"      : "sesans_and_model_3"
+            ,"show"       : "include_model_3"
         }
         ,{  
             "role"       : "output"
@@ -999,7 +1018,8 @@
             ,"label"     : "SESANS, simulated (with errors)"
             ,"type"      : "file"
             ,"help"      : "<p>Simulated SESANS</p>"
-            ,"show"      : ["sesans","include_model_3"]
+            #,"show"      : "sesans_and_model_3"
+            ,"show"       : "include_model_3"
         }
         ,{
             "role"       : "output"
@@ -1067,13 +1087,21 @@
             ,"help"       : "<p>Simulated intensity, format: q, I(q), sigma.</p><p>sigma simulated using Sedlak et al (https://doi.org/10.1107/S1600576717003077)</p>"
             ,"show"       : "include_model_4"
         }
+	#,{
+        #    "role"      : "input"
+        #    ,"id"        : "sesans_and_model4"
+        #    ,"type"      : "hidden"
+        #    ,"value"     : "false"
+        #    ,"computed"  : "sesans && include_model_4"
+        #}
         ,{
             "role"       : "output"
             ,"id"        : "G_4"
             ,"label"     : "Theoretical SESANS"
             ,"type"      : "file"
             ,"help"      : "<p>Calculated SESANS</p>"
-            ,"show"      : ["sesans","include_model_4"]
+            #,"show"      : "sesans_and_model_4"
+            ,"show"       : "include_model_4"
         }
         ,{
             "role"       : "output"
@@ -1081,7 +1109,8 @@
             ,"label"     : "SESANS, simulated (with errors)"
             ,"type"      : "file"
             ,"help"      : "<p>Simulated SESANS</p>"
-            ,"show"      : ["sesans","include_model_4"]
+            #,"show"      : "sesans_and_model_4"
+            ,"show"       : "include_model_4"
         }
         ,{
             "role"       : "output"
